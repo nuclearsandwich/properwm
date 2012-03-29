@@ -152,6 +152,7 @@ static void configure(Client *c);
 static void configurenotify(XEvent *e);
 static void configurerequest(XEvent *e);
 static Monitor *createmon(void);
+static void crosshair(Monitor *m);
 static void destroynotify(XEvent *e);
 static void detach(Client *c);
 static void detachstack(Client *c);
@@ -429,11 +430,27 @@ arrange(Monitor *m) {
 void
 arrangemon(Monitor *m) {
     strncpy(m->ltsymbol, m->lts[m->curtag]->symbol, sizeof m->ltsymbol);
-    if(m->lts[m->curtag]->arrange) {
-        if (smartborders)
-            updateborders(m);
+
+    /* restore borders in floating layout */
+    if (smartborders && m->lts[m->curtag]->arrange == NULL) {
+        Client *c;
+        int oldw;
+        int oldh;
+        for (c = nexttiled(m->clients); c; c = nexttiled(c->next)) {
+            if (c->bw == 0) {
+                c->bw = borderpx;
+                oldw = c->w;
+                oldh = c->h;
+                /* kick xlib */
+                resize(c, c->x, c->y, oldw - (2*c->bw), oldh - (2*c->bw), false);
+                resize(c, c->x, c->y, oldw, oldh, false);
+            }
+        }
+    } else if (smartborders)
+        updateborders(m);
+
+    if (m->lts[m->curtag]->arrange)
         m->lts[m->curtag]->arrange(m);
-    }
 }
 
 void
@@ -590,6 +607,7 @@ configure(Client *c) {
     ce.border_width = c->bw;
     ce.above = None;
     ce.override_redirect = false;
+
     XSendEvent(dpy, c->win, false, StructureNotifyMask, (XEvent *)&ce);
 }
 
@@ -690,6 +708,107 @@ createmon(void) {
 
     strncpy(m->ltsymbol, layouts[0].symbol, sizeof m->ltsymbol);
     return m;
+}
+
+void
+crosshair(Monitor* m) {
+    int n = ntiled(m);
+
+    if (n == 0)
+        return;
+
+    /* window counts */
+
+    int nm;
+
+    if (n <= m->nmasters[m->curtag]) {
+        if (n > 1)
+            nm = n-1;
+        else
+            nm = 1;
+    } else
+        nm = m->nmasters[m->curtag];
+
+    int ns = n-nm;
+    int nl;
+    int nr;
+
+    if (ns == 0) {
+        nl = 0;
+        nr = 0;
+    } else if (ns == 1) {
+        nl = 0;
+        nr = ns;
+    } else {
+        nl = ns%2;
+        nr = ns/2;
+    }
+
+    int bw = (smartborders && n == 1 ? 0 : borderpx);
+
+    /* area widths */
+
+    int mw;
+    if (n <= nm)
+        mw = m->ww;
+    else
+        mw = n ? m->ww * m->mfacts[m->curtag] : 0;
+
+    int tsw = (m->ww - mw);
+    int lw;
+    int rw;
+
+    if (nl == 0) {
+        lw = 0;
+        rw = tsw;
+    } else {
+        lw = tsw / 2;
+        rw = tsw / 2;
+    }
+
+    int mwh;
+    if (nm > 0)
+        mwh = (m->wh - ((2*bw)*nm) - (padding*(nm+1))) / nm;
+    else
+        mwh = 0; // make compiler stfu
+
+    int lww;
+    if (nl > 0)
+        lww = (lw - ((2*bw)*nl) - (padding*(nl))) / nl;
+    else
+        lww = 0; // make compiler stfu
+
+    int rww;
+    if (nr > 0)
+        rww = (rw - ((2*bw)*nr) - (padding*(nr))) / nr;
+    else
+        rww = 0; // make compiler stfu
+
+    int mx = lw;
+    int my = 0;
+    int rx = mx + mw;
+    int lx = 0;
+
+    int i;
+    Client *c;
+
+    for (i = 0, c = nexttiled(m->clients); c; c = nexttiled(c->next), i++) {
+        // populate center
+        if (i < nm) {
+            resize(c, mx + padding, m->wy + padding + my, mw - (padding*2), mwh, false);
+            my += padding + HEIGHT(c);
+        }
+        // populate right
+        else if (i < n-nl) {
+            resize(c, rx + padding, m->wy + padding, rww, m->wh - (padding*2), false);
+            rx += padding + WIDTH(c);
+        }
+        // populate left
+        else {
+            resize(c, lx + padding, m->wy + padding, lww, m->wh - (padding*2), false);
+            lx += padding + WIDTH(c);
+        }
+    }
 }
 
 void
@@ -1186,10 +1305,11 @@ manage(Window w, XWindowAttributes *wa) {
     updatesizehints(c);
     updatewmhints(c);
 
-    if(!c->isfloating)
+    if (!c->isfloating)
         c->isfloating = c->oldstate = trans != None || c->isfixed;
 
-    if (c->isfloating == false && smartborders && (c->mon->lts[c->mon->curtag]->arrange == &monocle || ntiled(c->mon) == 0))
+    if (smartborders && c->isfloating == false && c->mon->lts[c->mon->curtag]->arrange != NULL
+    && (c->mon->lts[c->mon->curtag]->arrange == &monocle || ntiled(c->mon) == 0))
         c->bw = 0;
     else
         c->bw = borderpx;
@@ -1200,12 +1320,8 @@ manage(Window w, XWindowAttributes *wa) {
     XSetWindowBorder(dpy, w, dc.norm[ColBorder]);
     configure(c); /* propagates border_width, if size doesn't change */
 
-    /* update******* (c) */
-
     XSelectInput(dpy, w, EnterWindowMask|FocusChangeMask|PropertyChangeMask|StructureNotifyMask);
     grabbuttons(c, false);
-
-    /* if(!c->isfloating) */
 
     if(c->isfloating)
         XRaiseWindow(dpy, c->win);
@@ -1356,7 +1472,7 @@ int
 ntiled(Monitor *m) {
     Client *c;
     int nt = 0;
-    for(c = nexttiled(m->clients); c; c = nexttiled(c->next))
+    for (c = nexttiled(m->clients); c; c = nexttiled(c->next))
         if (ISVISIBLE(c)) nt++;
     return nt;
 }
@@ -1717,12 +1833,15 @@ setfullscreen(Client *c, bool fullscreen) {
 
 void
 setlayout(const Arg *arg) {
-    if(!arg || !arg->v || arg->v == selmon->lts[selmon->curtag])
+    if (!arg || !arg->v || arg->v == selmon->lts[selmon->curtag])
         return;
-    if(arg && arg->v)
+
+    if (arg && arg->v)
         selmon->lts[selmon->curtag] = (Layout *)arg->v;
+
     strncpy(selmon->ltsymbol, selmon->lts[selmon->curtag]->symbol, sizeof selmon->ltsymbol);
-    if(selmon->sel)
+
+    if (selmon->sel)
         arrange(selmon);
     else
         drawbar(selmon);
@@ -1870,7 +1989,7 @@ stack(Monitor *m) {
     else
         mh = m->wh;
 
-    bw = (smartborders && (n == 1 || m->lts[m->curtag]->arrange == &monocle) ? 0 : borderpx);
+    bw = (smartborders && n == 1 ? 0 : borderpx);
 
     mx = 0;
     sx = 0;
@@ -1992,7 +2111,7 @@ tile(Monitor *m) {
     else
         mw = m->ww;
 
-    bw = (smartborders && (n == 1 || m->lts[m->curtag]->arrange == &monocle) ? 0 : borderpx);
+    bw = (smartborders && n == 1 ? 0 : borderpx);
 
     my = 0;
     ty = 0;
@@ -2206,19 +2325,26 @@ updateborders(Monitor *m) {
         return;
 
     int bdr;
+
     if (m->lts[m->curtag]->arrange == &monocle || ntiled(m) == 1)
         bdr = 0;
     else
         bdr = borderpx;
 
     Client *c;
+    int oldw;
+    int oldh;
+
     for (c = nexttiled(m->clients); c; c = nexttiled(c->next)) {
         if (!ISVISIBLE(c))
             continue;
 
         if (c->bw != bdr) {
+            oldw = c->w;
+            oldh = c->h;
             c->bw = bdr;
-            configure(c);
+            /* kick xlib */
+            resize(c, c->x, c->y, oldw - (2*borderpx), oldh - (2*borderpx), false);
         }
     }
 }
