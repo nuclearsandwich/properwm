@@ -1189,7 +1189,7 @@ manage(Window w, XWindowAttributes *wa) {
 	if(!c->isfloating)
 		c->isfloating = c->oldstate = trans != None || c->isfixed;
 
-    if (c->isfloating == false && (c->mon->lts[c->mon->curtag]->arrange == &monocle || ntiled(c->mon) == 1))
+    if (c->isfloating == false && (c->mon->lts[c->mon->curtag]->arrange == &monocle || ntiled(c->mon) == 0))
         c->bw = 0;
     else
         c->bw = borderpx;
