@@ -38,7 +38,6 @@ static const Layout layouts[] = {
 	/* symbol     arrange function */
     { "ST", stack },
 	{ "TI", tile },
-    { "CR", crosshair },
 	{ "FL", NULL },
 	{ "MO", monocle },
 };

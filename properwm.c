@@ -152,7 +152,6 @@ static void configure(Client *c);
 static void configurenotify(XEvent *e);
 static void configurerequest(XEvent *e);
 static Monitor *createmon(void);
-static void crosshair(Monitor *m);
 static void destroynotify(XEvent *e);
 static void detach(Client *c);
 static void detachstack(Client *c);
@@ -708,107 +707,6 @@ createmon(void) {
 
     strncpy(m->ltsymbol, layouts[0].symbol, sizeof m->ltsymbol);
     return m;
-}
-
-void
-crosshair(Monitor* m) {
-    int n = ntiled(m);
-
-    if (n == 0)
-        return;
-
-    /* window counts */
-
-    int nm;
-
-    if (n <= m->nmasters[m->curtag]) {
-        if (n > 1)
-            nm = n-1;
-        else
-            nm = 1;
-    } else
-        nm = m->nmasters[m->curtag];
-
-    int ns = n-nm;
-    int nl;
-    int nr;
-
-    if (ns == 0) {
-        nl = 0;
-        nr = 0;
-    } else if (ns == 1) {
-        nl = 0;
-        nr = ns;
-    } else {
-        nl = ns%2;
-        nr = ns/2;
-    }
-
-    int bw = (smartborders && n == 1 ? 0 : borderpx);
-
-    /* area widths */
-
-    int mw;
-    if (n <= nm)
-        mw = m->ww;
-    else
-        mw = n ? m->ww * m->mfacts[m->curtag] : 0;
-
-    int tsw = (m->ww - mw);
-    int lw;
-    int rw;
-
-    if (nl == 0) {
-        lw = 0;
-        rw = tsw;
-    } else {
-        lw = tsw / 2;
-        rw = tsw / 2;
-    }
-
-    int mwh;
-    if (nm > 0)
-        mwh = (m->wh - ((2*bw)*nm) - (padding*(nm+1))) / nm;
-    else
-        mwh = 0; // make compiler stfu
-
-    int lww;
-    if (nl > 0)
-        lww = (lw - ((2*bw)*nl) - (padding*(nl))) / nl;
-    else
-        lww = 0; // make compiler stfu
-
-    int rww;
-    if (nr > 0)
-        rww = (rw - ((2*bw)*nr) - (padding*(nr))) / nr;
-    else
-        rww = 0; // make compiler stfu
-
-    int mx = lw;
-    int my = 0;
-    int rx = mx + mw;
-    int lx = 0;
-
-    int i;
-    Client *c;
-
-    for (i = 0, c = nexttiled(m->clients); c; c = nexttiled(c->next), i++) {
-        // populate center
-        if (i < nm) {
-            resize(c, mx + padding, m->wy + padding + my, mw - (padding*2), mwh, false);
-            my += padding + HEIGHT(c);
-        }
-        // populate right
-        else if (i < n-nl) {
-            resize(c, rx + padding, m->wy + padding, rww, m->wh - (padding*2), false);
-            rx += padding + WIDTH(c);
-        }
-        // populate left
-        else {
-            resize(c, lx + padding, m->wy + padding, lww, m->wh - (padding*2), false);
-            lx += padding + WIDTH(c);
-        }
-    }
 }
 
 void
