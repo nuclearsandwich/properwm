@@ -1357,7 +1357,7 @@ ntiled(Monitor *m) {
     Client *c;
     int nt = 0;
     for(c = nexttiled(m->clients); c; c = nexttiled(c->next))
-        if(ISVISIBLE(c)) nt++;
+        if (ISVISIBLE(c)) nt++;
     return nt;
 }
 
@@ -1840,14 +1840,20 @@ spawn(const Arg *arg) {
 
 void
 stack(Monitor *m) {
-	unsigned int i, n, w, yp, hp, mh, mx, tx;
+	int n; // window count
+    int nm; // master area window count
+    int ns; // stack area window count
+    int mh; // master area height
+    int bw; // border width to use for calculations
+    int mww, mwh; // dimensions for windows in master area
+    int sww, swh; // dimensions for windows in stack area
+    int syp; // stack area y position padding
+    int mx, sx; // x positions
+
+    int i;
 	Client *c;
 
-	for(n = 0, c = nexttiled(m->clients); c; c = nexttiled(c->next), n++);
-	if(n == 0)
-		return;
-
-    int nm;
+    n = ntiled(m);
 
     if (n <= m->nmasters[m->curtag]) {
         if (n > 2)
@@ -1857,45 +1863,63 @@ stack(Monitor *m) {
     } else
         nm = m->nmasters[m->curtag];
 
+    ns = n-nm;
+
 	if(n > nm)
 		mh = nm ? m->wh * m->mfacts[m->curtag] : 0;
 	else
 		mh = m->wh;
 
-	for(i = mx = tx = 0, c = nexttiled(m->clients); c; c = nexttiled(c->next), i++)
+    bw = (smartborders && (n == 1 || m->lts[m->curtag]->arrange == &monocle) ? 0 : borderpx);
+
+    if (nm > 0) {
+        mww = (m->ww - ((2*bw) * nm) - (padding * (nm+1))) / nm;
+        mwh = mh - (2*bw) - (n > nm ? padding + (padding/2) : 2*padding);
+    } else {
+        mww = 0;
+        mwh = 0; // make compiler stfu
+    }
+
+    if (ns > 0) {
+        sww = (m->ww - ((2*bw) * ns) - (padding * (ns+1))) / ns;
+        swh = m->wh - mh - (2*bw) - (nm > 0 ? (padding/2) + padding : 2*padding);
+    } else {
+        sww = 0;
+        swh = 0; // make compiler stfu
+    }
+
+    syp = (nm > 0 ? padding/2 : padding);
+
+    mx = 0;
+    sx = 0;
+
+	for(i = 0, c = nexttiled(m->clients); c; c = nexttiled(c->next), i++)
 		if(i < nm) {
             /* -- MASTER --
              *
-             * FOR WIDTH:
+             * FOR HEIGHT:
              *
-             * when n > nmaster: subtract all of left padding and half of center padding
-             * when n <= nmaster: subtract both left and right padding for consistency */
+             * when n > nmaster: subtract all of top padding and half of middle padding
+             * when n <= nmaster: subtract both top and bottom padding for consistency */
 
-			w = (m->ww - mx) / (MIN(n, nm) - i);
-            hp = (n > nm ? padding + (padding/2) : 2*padding);
-
-			resize(c, m->wx + mx + padding, m->wy + padding, w - (2*c->bw) - (2*padding), mh - (2*c->bw) - hp, false);
-			mx += WIDTH(c) + padding;
+			resize(c, m->wx + mx + padding, m->wy + padding, mww, mwh, false);
+			mx += padding + WIDTH(c);
 		}
 		else {
             /* -- STACK --
              *
-             * FOR X POSITION:
+             * FOR Y POSITION:
              *
-             * when nmaster > 0: add half of padding to complete center padding
-             * when nmaster == 0: add full left padding for consistency
+             * when nmaster > 0: add half of padding to complete middle padding
+             * when nmaster == 0: add full top padding for consistency
              *
-             * FOR WIDTH:
+             * FOR HEIGHT:
              *
-             * when nmaster > 0: subtract half of center padding and all of right padding
-             * when nmaster == 0: subtract both left and right padding for consistency */
+             * when nmaster > 0: subtract half of middle padding and all of bottom padding
+             * when nmaster == 0: subtract both top and bottom padding for consistency */
 
-			w = (m->ww - tx) / (n - i);
-            yp = (nm > 0 ? padding/2 : padding);
-            hp = (nm > 0 ? (padding/2) + padding : 2*padding);
-
-			resize(c, m->wx + tx + padding, m->wy + mh + yp, w - (2*c->bw) - (2*padding), m->wh - mh - (2*c->bw) - hp, false);
-			tx += WIDTH(c) + padding;
+			resize(c, m->wx + sx + padding, m->wy + mh + syp, sww, swh, false);
+			sx += padding + WIDTH(c);
 		}
 }
 
@@ -1928,14 +1952,20 @@ textnw(const char *text, unsigned int len) {
 
 void
 tile(Monitor *m) {
-	unsigned int i, n, h, xp, wp, mw, my, ty;
+	int n; // window count
+    int nm; // master area window count
+    int nt; // tile area window count
+    int mw; // master area width
+    int bw; // border width to use for calculations
+    int mww, mwh; // dimensions for windows in master area
+    int tww, twh; // dimensions for windows in tile area
+    int txp; // tile area x padding
+    int my, ty; // y positions
+
+    int i;
 	Client *c;
 
-	for(n = 0, c = nexttiled(m->clients); c; c = nexttiled(c->next), n++);
-	if(n == 0)
-		return;
-
-    int nm;
+    n = ntiled(m);
 
     if (n <= m->nmasters[m->curtag]) {
         if (n > 2)
@@ -1945,12 +1975,37 @@ tile(Monitor *m) {
     } else
         nm = m->nmasters[m->curtag];
 
+    nt = n-nm;
+
 	if(n > nm)
 		mw = nm ? m->ww * m->mfacts[m->curtag] : 0;
 	else
 		mw = m->ww;
 
-	for(i = my = ty = 0, c = nexttiled(m->clients); c; c = nexttiled(c->next), i++)
+    bw = (smartborders && (n == 1 || m->lts[m->curtag]->arrange == &monocle) ? 0 : borderpx);
+
+    if (nm > 0) {
+        mww = mw - (2*bw) - (n > nm ? padding + (padding/2) : 2*padding);
+        mwh = (m->wh - ((2*bw) * nm) - (padding * (nm+1))) / nm;
+    } else {
+        mww = 0;
+        mwh = 0; // make compiler stfu
+    }
+
+    if (nt > 0) {
+        tww = m->ww - mw - (2*bw) - (nm > 0 ? (padding/2) + padding : 2*padding);
+        twh = (m->wh - ((2*bw) * nt) - (padding * (nt+1))) / nt;
+    } else {
+        tww = 0;
+        twh = 0; // make compiler stfu
+    }
+
+    txp = (nm > 0 ? padding/2 : padding);
+
+    my = 0;
+    ty = 0;
+
+	for(i = 0, c = nexttiled(m->clients); c; c = nexttiled(c->next), i++)
 		if(i < nm) {
             /* -- MASTER --
              *
@@ -1959,11 +2014,8 @@ tile(Monitor *m) {
              * when n > nmaster: subtract all of left padding and half of center padding
              * when n <= nmaster: subtract both left and right padding for consistency */
 
-			h = (m->wh - my) / (MIN(n, nm) - i);
-            wp = (n > nm ? padding + (padding/2) : 2*padding);
-
-			resize(c, m->wx + padding, m->wy + my + padding, mw - (2*c->bw) - wp, h - (2*c->bw) - (2*padding), false);
-			my += HEIGHT(c) + padding;
+			resize(c, m->wx + padding, m->wy + my + padding, mww, mwh, false);
+			my += padding + HEIGHT(c);
 		}
 		else {
             /* -- STACK --
@@ -1978,12 +2030,8 @@ tile(Monitor *m) {
              * when nmaster > 0: subtract half of center padding and all of right padding
              * when nmaster == 0: subtract both left and right padding for consistency */
 
-			h = (m->wh - ty) / (n - i);
-            xp = (nm > 0 ? padding/2 : padding);
-            wp = (nm > 0 ? (padding/2) + padding : 2*padding);
-
-			resize(c, m->wx + mw + xp, m->wy + ty + padding, m->ww - mw - (2*c->bw) - wp, h - (2*c->bw) - (2*padding), false);
-			ty += HEIGHT(c) + padding;
+			resize(c, m->wx + mw + txp, m->wy + ty + padding, tww, twh, false);
+			ty += padding + HEIGHT(c);
 		}
 }
 
