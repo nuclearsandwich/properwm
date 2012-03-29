@@ -1845,10 +1845,10 @@ stack(Monitor *m) {
     int ns; // stack area window count
     int mh; // master area height
     int bw; // border width to use for calculations
+    int mx, sx, rem; // x positions and initial offset calculation
     int mww, mwh; // dimensions for windows in master area
     int sww, swh; // dimensions for windows in stack area
     int syp; // stack area y position padding
-    int mx, sx; // x positions
 
     int i;
 	Client *c;
@@ -1872,10 +1872,18 @@ stack(Monitor *m) {
 
     bw = (smartborders && (n == 1 || m->lts[m->curtag]->arrange == &monocle) ? 0 : borderpx);
 
+    mx = 0;
+    sx = 0;
+
     if (nm > 0) {
         mww = (m->ww - ((2*bw) * nm) - (padding * (nm+1))) / nm;
         mwh = mh - (2*bw) - (n > nm ? padding + (padding/2) : 2*padding);
-    } else {
+
+        rem = (m->ww - ((2*bw) * nm) - (padding * (nm+1))) % nm;
+        if (rem > 0)
+            mx += (rem/2);
+    }
+    else {
         mww = 0;
         mwh = 0; // make compiler stfu
     }
@@ -1883,15 +1891,17 @@ stack(Monitor *m) {
     if (ns > 0) {
         sww = (m->ww - ((2*bw) * ns) - (padding * (ns+1))) / ns;
         swh = m->wh - mh - (2*bw) - (nm > 0 ? (padding/2) + padding : 2*padding);
-    } else {
+
+        rem = (m->ww - ((2*bw) * ns) - (padding * (ns+1))) % ns;
+        if (rem > 0)
+            sx += (rem/2);
+    }
+    else {
         sww = 0;
         swh = 0; // make compiler stfu
     }
 
     syp = (nm > 0 ? padding/2 : padding);
-
-    mx = 0;
-    sx = 0;
 
 	for(i = 0, c = nexttiled(m->clients); c; c = nexttiled(c->next), i++)
 		if(i < nm) {
@@ -1957,10 +1967,10 @@ tile(Monitor *m) {
     int nt; // tile area window count
     int mw; // master area width
     int bw; // border width to use for calculations
+    int my, ty, rem; // y positions and initial offset calculation
     int mww, mwh; // dimensions for windows in master area
     int tww, twh; // dimensions for windows in tile area
     int txp; // tile area x padding
-    int my, ty; // y positions
 
     int i;
 	Client *c;
@@ -1984,10 +1994,18 @@ tile(Monitor *m) {
 
     bw = (smartborders && (n == 1 || m->lts[m->curtag]->arrange == &monocle) ? 0 : borderpx);
 
+    my = 0;
+    ty = 0;
+
     if (nm > 0) {
         mww = mw - (2*bw) - (n > nm ? padding + (padding/2) : 2*padding);
         mwh = (m->wh - ((2*bw) * nm) - (padding * (nm+1))) / nm;
-    } else {
+
+        rem = (m->wh - ((2*bw) * nm) - (padding * (nm+1))) % nm;
+        if (rem > 0)
+            my += (rem/2);
+    }
+    else {
         mww = 0;
         mwh = 0; // make compiler stfu
     }
@@ -1995,15 +2013,17 @@ tile(Monitor *m) {
     if (nt > 0) {
         tww = m->ww - mw - (2*bw) - (nm > 0 ? (padding/2) + padding : 2*padding);
         twh = (m->wh - ((2*bw) * nt) - (padding * (nt+1))) / nt;
-    } else {
+
+        rem = (m->wh - ((2*bw) * nt) - (padding * (nt+1))) % nt;
+        if (rem > 0)
+            ty += (rem/2);
+    }
+    else {
         tww = 0;
         twh = 0; // make compiler stfu
     }
 
     txp = (nm > 0 ? padding/2 : padding);
-
-    my = 0;
-    ty = 0;
 
 	for(i = 0, c = nexttiled(m->clients); c; c = nexttiled(c->next), i++)
 		if(i < nm) {
