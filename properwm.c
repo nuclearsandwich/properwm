@@ -855,7 +855,7 @@ drawtext(const char *text, unsigned long col[ColLast], bool invert) {
     if(len < olen)
         for(i = len; i && i > len - 3; buf[--i] = '.');
     XSetForeground(dpy, dc.gc, col[invert ? ColBG : ColFG]);
-    if(dc.font.set)
+    if (dc.font.set)
         XmbDrawString(dpy, dc.drawable, dc.font.set, dc.gc, x, y, buf, len);
     else
         XDrawString(dpy, dc.drawable, dc.gc, x, y, buf, len);
@@ -874,7 +874,7 @@ enternotify(XEvent *e) {
         return;
     c = wintoclient(ev->window);
     m = c ? c->mon : wintomon(ev->window);
-    if(m != selmon) {
+    if (m != selmon) {
         unfocus(selmon->sel, true);
         selmon = m;
     }
@@ -1275,7 +1275,7 @@ monocle(Monitor *m) {
     if(n > 0) /* override layout symbol */
         snprintf(m->ltsymbol, sizeof m->ltsymbol, "[%d]", n);
     for(c = nexttiled(m->clients); c; c = nexttiled(c->next))
-        resize(c, m->wx, m->wy, m->ww - 2 * c->bw, m->wh - 2 * c->bw, false);
+        resize(c, m->wx + padding, m->wy + padding, m->ww - (2*c->bw) - (2*padding), m->wh - (2*c->bw) - (2*padding), false);
 }
 
 void
@@ -1518,13 +1518,23 @@ void
 resizeclient(Client *c, int x, int y, int w, int h) {
     XWindowChanges wc;
 
-    c->oldx = c->x; c->x = wc.x = x;
-    c->oldy = c->y; c->y = wc.y = y;
-    c->oldw = c->w; c->w = wc.width = w;
-    c->oldh = c->h; c->h = wc.height = h;
+    c->oldx = c->x;
+    c->x = wc.x = x;
+
+    c->oldy = c->y;
+    c->y = wc.y = y;
+
+    c->oldw = c->w;
+    c->w = wc.width = w;
+
+    c->oldh = c->h;
+    c->h = wc.height = h;
+
     wc.border_width = c->bw;
+
     XConfigureWindow(dpy, c->win, CWX|CWY|CWWidth|CWHeight|CWBorderWidth, &wc);
     configure(c);
+
     XSync(dpy, false);
 }
 
