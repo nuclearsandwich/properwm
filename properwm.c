@@ -22,6 +22,7 @@
  */
 #include <errno.h>
 #include <locale.h>
+//#include <loft.h>
 #include <stdarg.h>
 #include <signal.h>
 #include <stdio.h>
@@ -300,7 +301,7 @@ struct Monitor {
 
     Monitor *next;
     Window barwin;
-
+//  LoftWidget* bar;
 
     float mfacts[LENGTH(tags) + 1];
     int nmasters[LENGTH(tags) + 1];
@@ -473,12 +474,14 @@ buttonpress(XEvent *e) {
     XButtonPressedEvent *ev = &e->xbutton;
 
     click = ClkRootWin;
+
     /* focus monitor if necessary */
     if((m = wintomon(ev->window)) && m != selmon) {
         unfocus(selmon->sel, true);
         selmon = m;
         focus(NULL);
     }
+
     if(ev->window == selmon->barwin) {
         i = x = 0;
         do
@@ -499,6 +502,7 @@ buttonpress(XEvent *e) {
         focus(c);
         click = ClkClientWin;
     }
+
     for(i = 0; i < LENGTH(buttons); i++)
         if(click == buttons[i].click && buttons[i].func && buttons[i].button == ev->button
         && CLEANMASK(buttons[i].mask) == CLEANMASK(ev->state))
@@ -1780,15 +1784,19 @@ setup(void) {
     screen = DefaultScreen(dpy);
     root = RootWindow(dpy, screen);
     initfont(font);
+
     sw = DisplayWidth(dpy, screen);
     sh = DisplayHeight(dpy, screen);
     bh = dc.h = dc.font.height + 2;
+
     updategeom();
+
     /* init atoms */
     wmatom[WMProtocols] = XInternAtom(dpy, "WM_PROTOCOLS", false);
     wmatom[WMDelete] = XInternAtom(dpy, "WM_DELETE_WINDOW", false);
     wmatom[WMState] = XInternAtom(dpy, "WM_STATE", false);
     wmatom[WMTakeFocus] = XInternAtom(dpy, "WM_TAKE_FOCUS", false);
+
     netatom[NetActiveWindow] = XInternAtom(dpy, "_NET_ACTIVE_WINDOW", false);
     netatom[NetSupported] = XInternAtom(dpy, "_NET_SUPPORTED", false);
     netatom[NetWMName] = XInternAtom(dpy, "_NET_WM_NAME", false);
@@ -1797,37 +1805,107 @@ setup(void) {
     netatom[NetWMWindowType] = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE", false);
     netatom[NetWMWindowTypeDialog] = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE_DIALOG", false);
     netatom[NetClientList] = XInternAtom(dpy, "_NET_CLIENT_LIST", false);
+
     /* init cursors */
     cursor[CurNormal] = XCreateFontCursor(dpy, XC_left_ptr);
     cursor[CurResize] = XCreateFontCursor(dpy, XC_sizing);
     cursor[CurMove] = XCreateFontCursor(dpy, XC_fleur);
+
     /* init appearance */
     dc.norm[ColBorder] = getcolor(normbordercolor);
     dc.norm[ColBG] = getcolor(normbgcolor);
     dc.norm[ColFG] = getcolor(normfgcolor);
+
     dc.sel[ColBorder] = getcolor(selbordercolor);
     dc.sel[ColBG] = getcolor(selbgcolor);
     dc.sel[ColFG] = getcolor(selfgcolor);
+
     dc.drawable = XCreatePixmap(dpy, root, DisplayWidth(dpy, screen), bh, DefaultDepth(dpy, screen));
     dc.gc = XCreateGC(dpy, root, 0, NULL);
+
     XSetLineAttributes(dpy, dc.gc, 1, LineSolid, CapButt, JoinMiter);
+
     if(!dc.font.set)
         XSetFont(dpy, dc.gc, dc.font.xfont->fid);
+
     /* init bars */
     updatebars();
     updatestatus();
+
     /* EWMH support per view */
     XChangeProperty(dpy, root, netatom[NetSupported], XA_ATOM, 32,
             PropModeReplace, (unsigned char *) netatom, NetLast);
     XDeleteProperty(dpy, root, netatom[NetClientList]);
+
     /* select for events */
     wa.cursor = cursor[CurNormal];
     wa.event_mask = SubstructureRedirectMask|SubstructureNotifyMask|ButtonPressMask|PointerMotionMask
                     |EnterWindowMask|LeaveWindowMask|StructureNotifyMask|PropertyChangeMask;
+
     XChangeWindowAttributes(dpy, root, CWEventMask|CWCursor, &wa);
     XSelectInput(dpy, root, wa.event_mask);
+
     grabkeys();
 }
+
+//void
+//setupbar(void) {
+//    loft_init(argc, argv);
+//
+//    /* main window */
+//    barwin = loft_widget_new();
+//    loft_widget_set_title(barwin, "PWM_PROTO");
+//    loft_widget_override_redirect(barwin, true);
+//    loft_widget_resize(barwin, 1600, 20);
+//    loft_widget_move(barwin, 0, 0);
+//
+//    LoftLabel* status = loft_label_new("STATUS");
+//    loft_widget_set_parent(&status->base, barwin);
+//    loft_widget_resize(&status->base, status->base.min_width, 20);
+//    loft_widget_move(&status->base, 1600 - status->base.width - 10, 0);
+//
+//    int i;
+//    char* s;
+//    LoftButton* tags[9];
+//    int xpos = 0;
+//
+//    for (i = 0; i < 9; i++) {
+//        s = malloc(2);
+//        sprintf(s, "%d", i+1);
+//        tags[i] = loft_button_new(s);
+//
+//        printf("created tag %d: (xpos %d, width %d)\n", i+1, xpos, tags[i]->base.min_width);
+//
+//        loft_widget_set_parent(&tags[i]->base, barwin);
+//        loft_widget_move(&tags[i]->base, xpos, 0);
+//        loft_widget_resize(&tags[i]->base, tags[i]->base.min_width, 20);
+//
+//        xpos += tags[i]->base.min_width;
+//
+//        int* tagptr = malloc(sizeof(int));
+//        memcpy(tagptr, &i, sizeof(int));
+//
+//        loft_signal_connect(&tags[i]->base, "clicked", on_tag_clicked, tagptr);
+//    }
+//
+//    xpos += 10;
+//
+//    LoftLabel* ltsel = loft_label_new("LTSYM");
+//    loft_widget_set_parent(&ltsel->base, barwin);
+//    loft_widget_resize(&ltsel->base, ltsel->base.min_width, 20);
+//    loft_widget_move(&ltsel->base, xpos, 0);
+//
+//    xpos += ltsel->base.min_width + 10;
+//
+//    LoftButton* titlebtn = loft_button_new("TITLE");
+//    loft_button_set_activatable(titlebtn, true);
+//    loft_widget_set_parent(&titlebtn->base, barwin);
+//    loft_widget_resize(&titlebtn->base, titlebtn->base.min_width, 20);
+//    loft_widget_move(&titlebtn->base, xpos, 0);
+//
+//    /* start */
+//    loft_widget_show_all(barwin);
+//}
 
 void
 showhide(Client *c) {
