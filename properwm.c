@@ -1706,8 +1706,8 @@ void setfullscreen (Client *c, bool fullscreen) {
         c->isfullscreen = true;
         c->oldbw = c->bw;
         c->bw = 0;
-        c->isfloating = true;
         c->oldstate = c->isfloating;
+        c->isfloating = true;
         resizeclient(c, c->mon->mx, c->mon->my, c->mon->mw, c->mon->mh);
         if (smartborders)
             updateborders(c->mon);
