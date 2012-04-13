@@ -2324,7 +2324,6 @@ void updateborders (Monitor *m) {
     if (m->lts[m->curtag]->arrange == NULL) {
         for (c = nexttiled(m->clients); c; c = nexttiled(c->next)) {
             if (c->bw == 0) {
-                printf("border 0 in floating - hmmm\n");
                 c->bw = borderpx;
                 resize(c, c->x, c->y, c->w - (2*c->bw), c->h - (2*c->bw), false);
             }
@@ -2561,12 +2560,9 @@ void view (const Arg *arg) {
             selmon->curtag = i;
         }
     } else {
-        selmon->prevtag = selmon->curtag ^ selmon->prevtag;
-        selmon->curtag ^= selmon->prevtag;
-        selmon->prevtag = selmon->curtag ^ selmon->prevtag;
-//        unsigned int oldcur = selmon->curtag;
-//        selmon->curtag = selmon->prevtag;
-//        selmon->prevtag = oldcur;
+        int oldcur = selmon->curtag;
+        selmon->curtag = selmon->prevtag;
+        selmon->prevtag = oldcur;
     }
 
     focus(NULL);
