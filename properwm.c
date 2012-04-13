@@ -1543,14 +1543,18 @@ void resizemouse (const Arg *arg) {
     Monitor *m;
     XEvent ev;
 
-    if(!(c = selmon->sel))
+    if (selmon->sel == NULL)
         return;
+
+    c = selmon->sel;
+
     restack(selmon);
     ocx = c->x;
     ocy = c->y;
-    if(XGrabPointer(dpy, root, false, MOUSEMASK, GrabModeAsync, GrabModeAsync,
-                    None, cursor[CurResize], CurrentTime) != GrabSuccess)
+
+    if (XGrabPointer(dpy, root, false, MOUSEMASK, GrabModeAsync, GrabModeAsync, None, cursor[CurResize], CurrentTime) != GrabSuccess)
         return;
+
     XWarpPointer(dpy, None, c->win, 0, 0, 0, 0, c->w + c->bw - 1, c->h + c->bw - 1);
     do {
         XMaskEvent(dpy, MOUSEMASK|ExposureMask|SubstructureRedirectMask, &ev);
