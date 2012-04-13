@@ -2,7 +2,7 @@
 
 /* appearance */
 static const char font[]            = "-*-terminus-medium-r-*-*-16-*-*-*-*-*-*-*";
-static const char normbordercolor[] = "#2F2F2F";
+static const char normbordercolor[] = "#222222";
 static const char normbgcolor[]     = "#111111";
 static const char normfgcolor[]     = "#888888";
 static const char selbordercolor[]  = "#CCCCCC";
@@ -81,8 +81,8 @@ static Key keys[] = {
     { MODKEY,                       XK_f,      setlayout,      {.v = &layouts[2]} },
     { MODKEY,                       XK_m,      setlayout,      {.v = &layouts[3]} },
     { MODKEY,                       XK_space,  togglefloating, {0} },
-    { MODKEY,                       XK_0,      view,           {.ui = ~0 } },
-    { MODKEY|ShiftMask,             XK_0,      tag,            {.ui = ~0 } },
+    { MODKEY,                       XK_0,      view,           {.ui = -1 } },
+    { MODKEY|ShiftMask,             XK_0,      tag,            {.ui = -1 } },
     { MODKEY,                       XK_comma,  focusmon,       {.i = -1 } },
     { MODKEY,                       XK_period, focusmon,       {.i = +1 } },
     { MODKEY|ShiftMask,             XK_comma,  tagmon,         {.i = -1 } },
