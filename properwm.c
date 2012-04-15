@@ -119,13 +119,13 @@ typedef struct {
 typedef struct {
     unsigned int mod;
     KeySym keysym;
-    void (*func)(const Arg *);
+    void (*func) (const Arg *);
     const Arg arg;
 } Key;
 
 typedef struct {
     const char *symbol;
-    void (*arrange)(Monitor *);
+    void (*arrange) (Monitor *);
 } Layout;
 
 typedef struct {
@@ -540,7 +540,7 @@ void cleanup (void) {
     for(m = mons; m; m = m->next)
         while(m->stack)
             unmanage(m->stack, false);
-    if(dc.font.set)
+    if (dc.font.set)
         XFreeFontSet(dpy, dc.font.set);
     else
         XFreeFont(dpy, dc.font.xfont);
@@ -550,7 +550,7 @@ void cleanup (void) {
     XFreeCursor(dpy, cursor[CurNormal]);
     XFreeCursor(dpy, cursor[CurResize]);
     XFreeCursor(dpy, cursor[CurMove]);
-    while(mons)
+    while (mons)
         cleanupmon(mons);
     XSync(dpy, false);
     XSetInputFocus(dpy, PointerRoot, RevertToPointerRoot, CurrentTime);
@@ -560,7 +560,7 @@ void cleanup (void) {
 void cleanupmon (Monitor *mon) {
     Monitor *m;
 
-    if(mon == mons)
+    if (mon == mons)
         mons = mons->next;
     else {
         for(m = mons; m && m->next != mon; m = m->next);
@@ -627,16 +627,16 @@ void configurenotify (XEvent *e) {
     XConfigureEvent *ev = &e->xconfigure;
     bool dirty;
 
-    if(ev->window == root) {
+    if (ev->window == root) {
         dirty = (sw != ev->width);
         sw = ev->width;
         sh = ev->height;
-        if(updategeom() || dirty) {
-            if(dc.drawable != 0)
+        if (updategeom() || dirty) {
+            if (dc.drawable != 0)
                 XFreePixmap(dpy, dc.drawable);
             dc.drawable = XCreatePixmap(dpy, root, sw, bh, DefaultDepth(dpy, screen));
             updatebars();
-            for(m = mons; m; m = m->next)
+            for (m = mons; m; m = m->next)
                 XMoveResizeWindow(dpy, m->barwin, m->wx, m->by, m->ww, bh);
             focus(NULL);
             arrange(NULL);
@@ -1196,9 +1196,9 @@ void manage (Window w, XWindowAttributes *wa) {
     c->h = c->oldh = wa->height;
     c->oldbw = wa->border_width;
 
-    if(c->x + WIDTH(c) > c->mon->mx + c->mon->mw)
+    if (c->x + WIDTH(c) > c->mon->mx + c->mon->mw)
         c->x = c->mon->mx + c->mon->mw - WIDTH(c);
-    if(c->y + HEIGHT(c) > c->mon->my + c->mon->mh)
+    if (c->y + HEIGHT(c) > c->mon->my + c->mon->mh)
         c->y = c->mon->my + c->mon->mh - HEIGHT(c);
 
     c->x = MAX(c->x, c->mon->mx);
@@ -2187,19 +2187,27 @@ void togglebar (const Arg *arg) {
 }
 
 void togglefloating (const Arg *arg) {
-    if(!selmon->sel)
+    if (selmon->sel == NULL)
         return;
+
     selmon->sel->isfloating = !selmon->sel->isfloating || selmon->sel->isfixed;
-    if(selmon->sel->isfloating) {
-        /* restore border if necessary */
-        if (selmon->sel->bw == 0) {
-            selmon->sel->bw = borderpx;
-            configure(selmon->sel);
-        }
-        resize(selmon->sel, selmon->sel->x, selmon->sel->y,
-               selmon->sel->w, selmon->sel->h, false);
-    } else if(selmon->sel->isfullscreen)
+
+    int oldw = selmon->sel->w;
+    int oldh = selmon->sel->h;
+
+    if (selmon->sel->isfloating && selmon->sel->bw == 0) {
+        selmon->sel->bw = borderpx;
+        configure(selmon->sel);
+
+        oldw += (2*borderpx);
+        oldh += (2*borderpx);
+
+//        resize(selmon->sel, selmon->sel->x, selmon->sel->y, selmon->sel->w - (2*selmon->sel->bw), selmon->sel->h - (2*selmon->sel->bw), false);
+        resize(selmon->sel, selmon->sel->x, selmon->sel->y, oldw, oldh, false);
+    }
+    else if (selmon->sel->isfullscreen)
         setfullscreen(selmon->sel, false);
+
     arrange(selmon);
 }
 
@@ -2325,11 +2333,18 @@ void updatebarpos (Monitor *m) {
 void updateborders (Monitor *m) {
     Client *c;
 
+    int oldw;
+    int oldh;
+
     if (m->lts[m->curtag]->arrange == NULL) {
         for (c = nexttiled(m->clients); c; c = nexttiled(c->next)) {
+            oldw = WIDTH(c);
+            oldh = HEIGHT(c);
+
             if (c->bw == 0) {
                 c->bw = borderpx;
                 resize(c, c->x, c->y, c->w - (2*c->bw), c->h - (2*c->bw), false);
+                resize(c, c->x, c->y, oldw, oldh, false);
             }
         }
         return;
@@ -2346,10 +2361,15 @@ void updateborders (Monitor *m) {
         if (ISVISIBLE(c) == false)
             continue;
 
+        oldw = c->w;
+        oldh = c->h;
+
         if (c->bw != bdr) {
             c->bw = bdr;
+
             /* kick xlib */
             resize(c, c->x, c->y, c->w - (2*borderpx), c->h - (2*borderpx), false);
+            resize(c, c->x, c->y, oldw, oldh, false);
         }
     }
 }
