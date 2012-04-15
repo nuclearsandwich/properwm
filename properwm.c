@@ -1676,12 +1676,12 @@ bool sendevent (Client *c, Atom proto) {
     bool exists = false;
     XEvent ev;
 
-    if(XGetWMProtocols(dpy, c->win, &protocols, &n)) {
+    if (XGetWMProtocols(dpy, c->win, &protocols, &n)) {
         while(!exists && n--)
             exists = protocols[n] == proto;
         XFree(protocols);
     }
-    if(exists) {
+    if (exists) {
         ev.type = ClientMessage;
         ev.xclient.window = c->win;
         ev.xclient.message_type = wmatom[WMProtocols];
@@ -1694,7 +1694,7 @@ bool sendevent (Client *c, Atom proto) {
 }
 
 void setfocus (Client *c) {
-    if(!c->neverfocus) {
+    if (!c->neverfocus) {
         XSetInputFocus(dpy, c->win, RevertToPointerRoot, CurrentTime);
         XChangeProperty(dpy, root, netatom[NetActiveWindow],
                          XA_WINDOW, 32, PropModeReplace,
@@ -1704,7 +1704,7 @@ void setfocus (Client *c) {
 }
 
 void setfullscreen (Client *c, bool fullscreen) {
-    if(fullscreen) {
+    if (fullscreen) {
         XChangeProperty(dpy, c->win, netatom[NetWMState], XA_ATOM, 32,
                         PropModeReplace, (unsigned char*)&netatom[NetWMFullscreen], 1);
         c->isfullscreen = true;
@@ -1728,8 +1728,9 @@ void setfullscreen (Client *c, bool fullscreen) {
         c->w = c->oldw;
         c->h = c->oldh;
         resizeclient(c, c->x, c->y, c->w, c->h);
-        arrange(c->mon);
     }
+
+    arrange(c->mon);
 }
 
 void setlayout (const Arg *arg) {
@@ -2192,18 +2193,26 @@ void togglefloating (const Arg *arg) {
 
     selmon->sel->isfloating = !selmon->sel->isfloating || selmon->sel->isfixed;
 
-    int oldw = selmon->sel->w;
-    int oldh = selmon->sel->h;
+    // some clients are fucked
+
+    int w = WIDTH(selmon->sel);
+    int h = HEIGHT(selmon->sel);
+
+    int nw;
+    int nh;
 
     if (selmon->sel->isfloating && selmon->sel->bw == 0) {
         selmon->sel->bw = borderpx;
         configure(selmon->sel);
 
-        oldw += (2*borderpx);
-        oldh += (2*borderpx);
+        nw = WIDTH(selmon->sel) - (2*selmon->sel->bw);
+        nh = HEIGHT(selmon->sel) - (2*selmon->sel->bw);
 
-//        resize(selmon->sel, selmon->sel->x, selmon->sel->y, selmon->sel->w - (2*selmon->sel->bw), selmon->sel->h - (2*selmon->sel->bw), false);
-        resize(selmon->sel, selmon->sel->x, selmon->sel->y, oldw, oldh, false);
+        /* xlib = POS */
+        if (nw == w && nh == h)
+            resize(selmon->sel, selmon->sel->x, selmon->sel->y, nw - (2*selmon->sel->bw), nh - (2*selmon->sel->bw), false);
+
+        resize(selmon->sel, selmon->sel->x, selmon->sel->y, WIDTH(selmon->sel) - (2*borderpx), HEIGHT(selmon->sel) - (2*borderpx), false);
     }
     else if (selmon->sel->isfullscreen)
         setfullscreen(selmon->sel, false);
@@ -2338,11 +2347,12 @@ void updateborders (Monitor *m) {
 
     if (m->lts[m->curtag]->arrange == NULL) {
         for (c = nexttiled(m->clients); c; c = nexttiled(c->next)) {
-            oldw = WIDTH(c);
-            oldh = HEIGHT(c);
-
             if (c->bw == 0) {
                 c->bw = borderpx;
+
+                oldw = WIDTH(c);
+                oldh = HEIGHT(c);
+
                 resize(c, c->x, c->y, c->w - (2*c->bw), c->h - (2*c->bw), false);
                 resize(c, c->x, c->y, oldw, oldh, false);
             }
@@ -2361,8 +2371,8 @@ void updateborders (Monitor *m) {
         if (ISVISIBLE(c) == false)
             continue;
 
-        oldw = c->w;
-        oldh = c->h;
+        oldw = WIDTH(c);
+        oldh = HEIGHT(c);
 
         if (c->bw != bdr) {
             c->bw = bdr;
