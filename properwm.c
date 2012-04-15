@@ -672,10 +672,12 @@ void configurerequest (XEvent *e) {
                 c->oldh = c->h;
                 c->h = ev->height;
             }
+
             if ((c->x + c->w) > m->mx + m->mw && c->isfloating)
                 c->x = m->mx + (m->mw / 2 - WIDTH(c) / 2); /* center in x direction */
             if ((c->y + c->h) > m->my + m->mh && c->isfloating)
                 c->y = m->my + (m->mh / 2 - HEIGHT(c) / 2); /* center in y direction */
+
             if ((ev->value_mask & (CWX|CWY)) && !(ev->value_mask & (CWWidth|CWHeight)))
                 configure(c);
             if (ISVISIBLE(c))
@@ -2380,7 +2382,7 @@ void updateborders (Monitor *m) {
 
             c->bw = bdr;
 
-            resize(c, c->x, c->y, oldw - (2*c->bw), oldh - (2*c->bw), false);
+            resize(c, c->x, c->y, oldw - (2*borderpx), oldh - (2*borderpx), false);
             resize(c, c->x, c->y, oldw, oldh, false);
         }
     }
