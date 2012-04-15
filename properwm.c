@@ -2204,7 +2204,7 @@ void togglefloating (const Arg *arg) {
 
         selmon->sel->bw = borderpx;
 
-        resize(selmon->sel, selmon->sel->x, selmon->sel->y, oldw - (2*selmon->sel->bw), oldh - (2*selmon->sel->bw), false);
+//        resize(selmon->sel, selmon->sel->x, selmon->sel->y, oldw - (2*selmon->sel->bw), oldh - (2*selmon->sel->bw), false);
         resize(selmon->sel, selmon->sel->x, selmon->sel->y, oldw, oldh, false);
 
         if (WIDTH(selmon->sel) > oldw && HEIGHT(selmon->sel) > oldh)
@@ -2382,7 +2382,7 @@ void updateborders (Monitor *m) {
 
             c->bw = bdr;
 
-            resize(c, c->x, c->y, oldw - (2*borderpx), oldh - (2*borderpx), false);
+//            resize(c, c->x, c->y, oldw - (2*borderpx), oldh - (2*borderpx), false);
             resize(c, c->x, c->y, oldw, oldh, false);
         }
     }
