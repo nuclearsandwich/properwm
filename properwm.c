@@ -2193,26 +2193,23 @@ void togglefloating (const Arg *arg) {
 
     selmon->sel->isfloating = !selmon->sel->isfloating || selmon->sel->isfixed;
 
-    // some clients are fucked
-
-    int w = WIDTH(selmon->sel);
-    int h = HEIGHT(selmon->sel);
-
-    int nw;
-    int nh;
+    int oldw;
+    int oldh;
 
     if (selmon->sel->isfloating && selmon->sel->bw == 0) {
+        oldw = WIDTH(selmon->sel);
+        oldh = HEIGHT(selmon->sel);
+
         selmon->sel->bw = borderpx;
-        configure(selmon->sel);
 
-        nw = WIDTH(selmon->sel) - (2*selmon->sel->bw);
-        nh = HEIGHT(selmon->sel) - (2*selmon->sel->bw);
+        resize(selmon->sel, selmon->sel->x, selmon->sel->y, oldw - (2*selmon->sel->bw), oldh - (2*selmon->sel->bw), false);
+        resize(selmon->sel, selmon->sel->x, selmon->sel->y, oldw, oldh, false);
 
-        /* xlib = POS */
-        if (nw == w && nh == h)
-            resize(selmon->sel, selmon->sel->x, selmon->sel->y, nw - (2*selmon->sel->bw), nh - (2*selmon->sel->bw), false);
+        if (WIDTH(selmon->sel) > oldw && HEIGHT(selmon->sel) > oldh)
+            resize(selmon->sel, selmon->sel->x, selmon->sel->y, oldw - (2*selmon->sel->bw), oldh - (2*selmon->sel->bw), false);
 
-        resize(selmon->sel, selmon->sel->x, selmon->sel->y, WIDTH(selmon->sel) - (2*borderpx), HEIGHT(selmon->sel) - (2*borderpx), false);
+        if (WIDTH(selmon->sel) < oldw && HEIGHT(selmon->sel) < oldh)
+            resize(selmon->sel, selmon->sel->x, selmon->sel->y, oldw, oldh, false);
     }
     else if (selmon->sel->isfullscreen)
         setfullscreen(selmon->sel, false);
@@ -2331,6 +2328,7 @@ void updatebars (void) {
 void updatebarpos (Monitor *m) {
     m->wy = m->my;
     m->wh = m->mh;
+
     if (m->showbar) {
         m->wh -= bh;
         m->by = m->topbar ? m->wy : m->wy + m->wh;
@@ -2348,13 +2346,18 @@ void updateborders (Monitor *m) {
     if (m->lts[m->curtag]->arrange == NULL) {
         for (c = nexttiled(m->clients); c; c = nexttiled(c->next)) {
             if (c->bw == 0) {
-                c->bw = borderpx;
-
                 oldw = WIDTH(c);
                 oldh = HEIGHT(c);
 
-                resize(c, c->x, c->y, c->w - (2*c->bw), c->h - (2*c->bw), false);
+                c->bw = borderpx;
+
                 resize(c, c->x, c->y, oldw, oldh, false);
+
+                if (WIDTH(c) > oldw && HEIGHT(c) > oldh)
+                    resize(c, c->x, c->y, oldw - (2*c->bw), oldh - (2*c->bw), false);
+
+                if (WIDTH(c) < oldw && HEIGHT(c) < oldh)
+                    resize(c, c->x, c->y, oldw, oldh, false);
             }
         }
         return;
@@ -2371,14 +2374,13 @@ void updateborders (Monitor *m) {
         if (ISVISIBLE(c) == false)
             continue;
 
-        oldw = WIDTH(c);
-        oldh = HEIGHT(c);
-
         if (c->bw != bdr) {
+            oldw = WIDTH(c);
+            oldh = HEIGHT(c);
+
             c->bw = bdr;
 
-            /* kick xlib */
-            resize(c, c->x, c->y, c->w - (2*borderpx), c->h - (2*borderpx), false);
+            resize(c, c->x, c->y, oldw - (2*c->bw), oldh - (2*c->bw), false);
             resize(c, c->x, c->y, oldw, oldh, false);
         }
     }
