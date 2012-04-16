@@ -2,6 +2,7 @@
 
 /* appearance */
 static const char font[]            = "-*-terminus-medium-r-*-*-16-*-*-*-*-*-*-*";
+static const char fontsize          = 12;
 static const char normbordercolor[] = "#222222";
 static const char normbgcolor[]     = "#111111";
 static const char normfgcolor[]     = "#888888";
@@ -10,7 +11,7 @@ static const char selbgcolor[]      = "#333333";
 static const char selfgcolor[]      = "#CCCCCC";
 static const unsigned int borderpx  = 1;        /* window border width */
 static const unsigned int padding   = 10;       /* window padding */
-static const unsigned int snap      = 15;       /* snap threshold */
+static const unsigned int snap      = 20;       /* snap threshold */
 static const bool showbar           = true;     /* bar visibility */
 static const bool topbar            = true;     /* place bar at top (false = bottom) */
 static const bool ffm               = false;    /* focus follows mouse */
