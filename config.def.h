@@ -2,7 +2,8 @@
 
 /* appearance */
 static const char font[]            = "-*-terminus-medium-r-*-*-16-*-*-*-*-*-*-*";
-static const char fontsize          = 12;
+//static const char font              = "Terminus"
+//static const char fontsize          = 16;
 static const char normbordercolor[] = "#222222";
 static const char normbgcolor[]     = "#111111";
 static const char normfgcolor[]     = "#888888";

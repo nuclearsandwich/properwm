@@ -865,7 +865,7 @@ void drawtext (const char *text, unsigned long col[ColLast], bool invert) {
     y = dc.y + (dc.h / 2) - (h / 2) + dc.font.ascent;
     x = dc.x + (h / 2);
 
-    /* shorten text ifnecessary */
+    /* shorten text if necessary */
     for (len = MIN(olen, sizeof buf); len && textnw(text, len) > dc.w - h; len--);
     if (len == 0)
         return;
