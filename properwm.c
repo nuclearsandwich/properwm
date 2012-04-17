@@ -21,8 +21,10 @@
  * To understand everything else, start reading main().
  */
 
+#include <air.h>
 #include <errno.h>
 #include <locale.h>
+#include <pthread.h>
 #include <stdarg.h>
 #include <signal.h>
 #include <stdio.h>
@@ -242,6 +244,9 @@ static int xerror(Display *dpy, XErrorEvent *ee);
 static int xerrordummy(Display *dpy, XErrorEvent *ee);
 static int xerrorstart(Display *dpy, XErrorEvent *ee);
 static void zoom(const Arg *arg);
+
+static void* run_air (void* arg);
+static TARGET(CurrentTag);
 
 /* variables */
 static const char broken[] = "broken";
@@ -690,7 +695,7 @@ Monitor* createmon (void) {
     if (!(m = (Monitor *)calloc(1, sizeof(Monitor))))
         die("fatal: could not malloc() %u bytes\n", sizeof(Monitor));
 
-    m->prevtag = m->curtag = 1;
+    m->prevtag = m->curtag = 0;
     m->tagset[0] = m->tagset[1] = 1;
     m->showbar = showbar;
     m->topbar = topbar;
@@ -1620,8 +1625,11 @@ void restack (Monitor *m) {
 
 void run (void) {
     XEvent ev;
-    /* main event loop */
     XSync(dpy, false);
+
+    pthread_t sthr;
+    pthread_create(&sthr, NULL, run_air, NULL);
+
     while (running && !XNextEvent(dpy, &ev))
         if (handler[ev.type])
             handler[ev.type](&ev); /* call handler */
@@ -2584,6 +2592,23 @@ void zoom (const Arg *arg) {
             return;
 
     pop(c);
+}
+
+void* run_air (void* arg) {
+    AirNode* n = air_node_default();
+    n->map = air_map_new();
+    air_map_set(n->map, "GET", "/CurrentTag", CurrentTag);
+    air_node_start(n);
+    return NULL;
+}
+
+TARGET(CurrentTag) {
+    char* s = malloc(56);
+    sprintf(s, "CURRENT TAG: %d", selmon->curtag);
+    pkt_append(rsp, s);
+    pkt_send(rsp, conn);
+    free(s);
+    return;
 }
 
 int main (int argc, char *argv[]) {
