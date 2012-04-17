@@ -6,7 +6,7 @@
  * events about window (dis-)appearance.  Only one X connection at a time is
  * allowed to select for this event mask.
  *
- * The event handlers of dwm are organized in an array which is accessed
+ * The event handlers of properwm are organized in an array which is accessed
  * whenever a new event has been fetched. This allows event dispatching
  * in O(1) time.
  *
@@ -690,7 +690,7 @@ Monitor* createmon (void) {
     if (!(m = (Monitor *)calloc(1, sizeof(Monitor))))
         die("fatal: could not malloc() %u bytes\n", sizeof(Monitor));
 
-    m->prevtag = m->curtag = 1;
+    m->prevtag = m->curtag = 0;
     m->tagset[0] = m->tagset[1] = 1;
     m->showbar = showbar;
     m->topbar = topbar;
@@ -1088,7 +1088,7 @@ void initfont (const char *fontstr) {
     dc.font.set = XCreateFontSet(dpy, fontstr, &missing, &n, &def);
     if (missing) {
         while(n--)
-            fprintf(stderr, "dwm: missing fontset: %s\n", missing[n]);
+            fprintf(stderr, "properwm: missing fontset: %s\n", missing[n]);
         XFreeStringList(missing);
     }
     if (dc.font.set) {
@@ -1869,7 +1869,7 @@ void spawn (const Arg *arg) {
             close(ConnectionNumber(dpy));
         setsid();
         execvp(((char **)arg->v)[0], (char **)arg->v);
-        fprintf(stderr, "dwm: execvp %s", ((char **)arg->v)[0]);
+        fprintf(stderr, "properwm: execvp %s", ((char **)arg->v)[0]);
         perror(" failed");
         exit(EXIT_SUCCESS);
     }
@@ -2560,7 +2560,7 @@ int xerror (Display *dpy, XErrorEvent *ee) {
     || (ee->request_code == X_CopyArea && ee->error_code == BadDrawable))
         return 0;
 
-    fprintf(stderr, "dwm: fatal error: request code=%d, error code=%d\n", ee->request_code, ee->error_code);
+    fprintf(stderr, "properwm: fatal error: request code=%d, error code=%d\n", ee->request_code, ee->error_code);
     return xerrorxlib(dpy, ee); /* may call exit */
 }
 
@@ -2569,7 +2569,7 @@ int xerrordummy (Display *dpy, XErrorEvent *ee) {
 }
 
 int xerrorstart (Display *dpy, XErrorEvent *ee) {
-    die("dwm: another window manager is already running\n");
+    die("properwm: another window manager is already running\n");
     return -1;
 }
 
@@ -2588,13 +2588,13 @@ void zoom (const Arg *arg) {
 
 int main (int argc, char *argv[]) {
     if (argc == 2 && !strcmp("-v", argv[1]))
-        die("ProperWM "VERSION", 2012 speeddefrost, 2006-2012 dwm authors -- see LICENSE for details\n");
+        die("ProperWM "VERSION", 2012 Andrew Felske, 2006-2012 properwm authors -- see LICENSE for details\n");
     else if (argc != 1)
-        die("usage: dwm [-v]\n");
+        die("usage: properwm [-v]\n");
     if (!setlocale(LC_CTYPE, "") || !XSupportsLocale())
         fputs("warning: no locale support\n", stderr);
     if (!(dpy = XOpenDisplay(NULL)))
-        die("dwm: cannot open display\n");
+        die("properwm: cannot open display\n");
     checkotherwm();
     setup();
     scan();
