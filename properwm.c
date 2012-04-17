@@ -22,7 +22,6 @@
  */
 
 #include <errno.h>
-//#include <loft.h>
 #include <locale.h>
 #include <stdarg.h>
 #include <signal.h>
@@ -137,27 +136,6 @@ typedef struct {
     bool isfloating;
     int monitor;
 } Rule;
-
-//typedef struct {
-//    LoftWidget base;
-//    int num;
-//    char* name;
-//    bool selected;
-//} TagButton;
-//
-//typedef struct {
-//    LoftWidget base;
-//    int numtags;
-//    TagButton** tags;
-//} TagStrip;
-//
-//typedef struct {
-//    LoftWidget base;
-//    TagStrip* ts;
-//    LoftLabel* ltsym;
-//    LoftLabel* title;
-//    LoftLabel* status;
-//} Bar;
 
 /* function declarations */
 static void applyrules(Client *c);
@@ -322,7 +300,6 @@ struct Monitor {
     Client *stack;
 
     Window barwin;
-//    Bar* bar;
 
     float mfacts[LENGTH(tags)];
     int nmasters[LENGTH(tags)];
@@ -1392,50 +1369,6 @@ void movemouse (const Arg *arg) {
     }
 }
 
-//Bar* newbar (void) {
-//    Bar* bar = malloc(sizeof(Bar));
-//    loft_widget_init(&bar->base);
-//
-//    /* tag strip */
-//
-//    bar->ts = malloc(sizeof(TagStrip));
-//    loft_widget_init(&bar->ts->base);
-//    loft_layout_attach(&bar->lt, &bar->ts->base);
-//
-//    bar->ts->ntags = LENGTH(tags);
-//    bar->ts->tags = malloc(sizeof(TagButton*) * bar->ts->ntags);
-//
-//    /* layout symbol */
-//
-//    bar->ltsym = loft_label_new(layouts[0].symbol);
-//    loft_layout_attach(bar->base.lt, &bar->ltsym->base);
-//
-//    /* create and attach tag buttons */
-//
-//    TagButton* tb;
-//
-//    for (i = 0; i < LENGTH(tags); i++) {
-//        tb = malloc(sizeof(TagButton));
-//        loft_widget_init(&tb->base);
-//
-//        tb->num = i;
-//        tb->name = tags[i];
-//        tb->selected = (i == 0);
-//
-//        b->ts->tags[i] = tb;
-//
-//        loft_signal_connect(&tb->base, "button-press", on_tag_btn_clicked, NULL);
-//        loft_layout_attach(ts->base.lt, &tb->base, false, false);
-//    }
-//
-//    /* layout symbol, title, and status */
-//
-//    bar->title = loft_label_new(NULL);
-//    bar->status = loft_label_new(NULL);
-//
-//    return bar;
-//}
-
 Client* nexttiled (Client *c) {
     for(; c && (c->isfloating || !ISVISIBLE(c)); c = c->next);
     return c;
@@ -1448,15 +1381,6 @@ int ntiled (Monitor *m) {
         if (ISVISIBLE(c)) nt++;
     return nt;
 }
-
-//void on_tag_btn_clicked (TagButton* tb, XButtonEvent* ev) {
-//    const Arg arg = { .ui = tb->num };
-//
-//    if (ev->button == 1)
-//        view(arg);
-//    else if (ev->button == 3)
-//        toggletag(arg);
-//}
 
 void pop (Client *c) {
     detach(c);
@@ -2059,28 +1983,6 @@ void tag (const Arg *arg) {
         arrange(selmon);
     }
 }
-
-//void tag_button_draw (TagButton* tb) {
-//    cairo_t* cr = cairo_create(tb->base.cs);
-//
-//    LoftRGBA* bg = loft_rgba_from_hex(tb->selected ? selbgcolor : normbgcolor);
-//
-//    loft_cairo_set_rgba(cr, bg);
-//    cairo_rectangle(cr, 0, 0, tb->base.width, tb->base.height);
-//    cairo_fill(cr);
-//
-//    LoftRGBA* fg = loft_rgba_from_hex(tb->selected ? selfgcolor : normfgcolor);
-//
-//    loft_cairo_set_rgba(cr, fg);
-//    cairo_set_font_size(fontsize);
-//
-//    cairo_text_extents ext;
-//    cairo_text_extents(cr, tb->name, &ext);
-//    loft_widget_set_minimum_size(&tb->base, ext.width + ext.x_bearing, ext.height);
-//
-//    cairo_move_to(cr, tb->base.min_width/2, tb->base.min_height/2);
-//    cairo_show_text(cr, tb->name);
-//}
 
 void tagmon (const Arg *arg) {
     if (selmon->sel == NULL || mons->next == NULL)
