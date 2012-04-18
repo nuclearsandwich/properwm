@@ -1,27 +1,4 @@
-/* See LICENSE file for copyright and license details.
- *
- * dynamic window manager is designed like any other X client as well. It is
- * driven through handling X events. In contrast to other X clients, a window
- * manager selects for SubstructureRedirectMask on the root window, to receive
- * events about window (dis-)appearance.  Only one X connection at a time is
- * allowed to select for this event mask.
- *
- * The event handlers of properwm are organized in an array which is accessed
- * whenever a new event has been fetched. This allows event dispatching
- * in O(1) time.
- *
- * Each child of the root window is called a client, except windows which have
- * set the override_redirect flag.  Clients are organized in a linked client
- * list on each monitor, the focus history is remembered through a stack list
- * on each monitor. Each client contains a bit array to indicate the tags of a
- * client.
- *
- * Keys and tagging rules are organized as arrays and defined in config.h.
- *
- * To understand everything else, start reading main().
- */
-
-#include <air.h>
+#include <air/proto/st.h>
 #include <errno.h>
 #include <locale.h>
 #include <pthread.h>
@@ -43,7 +20,7 @@
 #include <X11/Xutil.h>
 #ifdef XINERAMA
 #include <X11/extensions/Xinerama.h>
-#endif/* XINERAMA */
+#endif
 
 /* macros */
 #define BUTTONMASK              (ButtonPressMask|ButtonReleaseMask)
@@ -245,8 +222,12 @@ static int xerrordummy(Display *dpy, XErrorEvent *ee);
 static int xerrorstart(Display *dpy, XErrorEvent *ee);
 static void zoom(const Arg *arg);
 
+/* server targets */
+
 static void* run_air (void* arg);
-static TARGET(CurrentTag);
+static ST_TARGET(CurrentTag);
+static ST_TARGET(CurrentLayout);
+static ST_TARGET(ClientName);
 
 /* variables */
 static const char broken[] = "broken";
@@ -1625,14 +1606,16 @@ void restack (Monitor *m) {
 
 void run (void) {
     XEvent ev;
+
     XSync(dpy, false);
 
     pthread_t sthr;
     pthread_create(&sthr, NULL, run_air, NULL);
 
-    while (running && !XNextEvent(dpy, &ev))
+    while (running && XNextEvent(dpy, &ev) == 0) {
         if (handler[ev.type])
-            handler[ev.type](&ev); /* call handler */
+            handler[ev.type](&ev);
+    }
 }
 
 void scan (void) {
@@ -2595,20 +2578,37 @@ void zoom (const Arg *arg) {
 }
 
 void* run_air (void* arg) {
-    AirNode* n = air_node_default();
-    n->map = air_map_new();
-    air_map_set(n->map, "GET", "/CurrentTag", CurrentTag);
-    air_node_start(n);
+    st_node* stn = st_node_new(1100);
+    st_map_set(stn->map, "GET", "/CurrentTag", CurrentTag);
+    st_map_set(stn->map, "GET", "/CurrentLayout", CurrentLayout);
+    st_map_set(stn->map, "GET", "/ClientName", ClientName);
+    air_node_start(&stn->base);
     return NULL;
 }
 
-TARGET(CurrentTag) {
-    char* s = malloc(56);
-    sprintf(s, "CURRENT TAG: %d", selmon->curtag);
-    pkt_append(rsp, s);
-    pkt_send(rsp, conn);
+ST_TARGET(CurrentTag) {
+    char* s = malloc(16);
+    sprintf(s, "%d", selmon->curtag);
+
+    st_pkt_append(rsp, s);
+    st_pkt_send(rsp, conn);
+
     free(s);
     return;
+}
+
+ST_TARGET(CurrentLayout) {
+    st_pkt_append(rsp, (char*) selmon->lts[selmon->curtag]->symbol);
+    st_pkt_send(rsp, conn);
+}
+
+ST_TARGET(ClientName) {
+    if (selmon->sel == NULL)
+        st_pkt_append(rsp, "</3");
+    else
+        st_pkt_append(rsp, selmon->sel->name);
+
+    st_pkt_send(rsp, conn);
 }
 
 int main (int argc, char *argv[]) {
