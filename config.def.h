@@ -2,8 +2,6 @@
 
 /* appearance */
 static const char font[]            = "-*-terminus-medium-r-*-*-16-*-*-*-*-*-*-*";
-//static const char font              = "Terminus"
-//static const char fontsize          = 16;
 static const char normbordercolor[] = "#222222";
 static const char normbgcolor[]     = "#111111";
 static const char normfgcolor[]     = "#888888";
@@ -57,7 +55,7 @@ static const Layout layouts[] = {
 
 /* commands */
 static const char *dmenucmd[] = { "dmenu_run", "-b", "-fn", font, "-nb", normbgcolor, "-nf", normfgcolor, "-sb", selbgcolor, "-sf", selfgcolor, NULL };
-static const char *termcmd[]  = { "roxterm", NULL };
+static const char *termcmd[]  = { "urxvt", NULL };
 static const char *browsercmd[] = { "chromium", NULL };
 
 static Key keys[] = {
