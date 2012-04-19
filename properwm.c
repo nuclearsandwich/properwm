@@ -244,6 +244,7 @@ static void* init_remote (void* arg);
 
 static ST_TARGET(ClientName);
 static ST_TARGET(CurrentLayout);
+static ST_TARGET(CurrentMonitor);
 static ST_TARGET(CurrentTag);
 static ST_TARGET(ToggleBar);
 static ST_TARGET(ToggleBarPosition);
@@ -2675,6 +2676,7 @@ void* init_remote (void* arg) {
 
     st_map_set(stn->map, "GET", "/ClientName", ClientName);
     st_map_set(stn->map, "GET", "/CurrentLayout", CurrentLayout);
+    st_map_set(stn->map, "GET", "CurrentMonitor", CurrentMonitor);
     st_map_set(stn->map, "GET", "/CurrentTag", CurrentTag);
     st_map_set(stn->map, "POST", "/ToggleBar", ToggleBar);
     st_map_set(stn->map, "POST", "/ToggleBarPosition", ToggleBarPosition);
@@ -2701,6 +2703,14 @@ ST_TARGET(CurrentLayout) {
     st_pkt_send(rsp, conn);
 }
 
+ST_TARGET(CurrentMonitor) {
+    char* mstr = malloc(16);
+    sprintf(mstr, "%d", selmon->num);
+    st_pkt_append(rsp, mstr);
+    st_pkt_send(rsp, conn);
+    free(mstr);
+}
+
 ST_TARGET(CurrentTag) {
     char* s = malloc(16);
     sprintf(s, "%d", selmon->curtag);
@@ -2709,7 +2719,6 @@ ST_TARGET(CurrentTag) {
     st_pkt_send(rsp, conn);
 
     free(s);
-    return;
 }
 
 ST_TARGET(ToggleBar) {
