@@ -54,7 +54,7 @@ enum { CurNormal, CurResize, CurMove, CurLast };
 enum { ColBorder, ColFG, ColBG, ColLast };
 enum { NetSupported,
        NetWMName, NetWMState,
-       NetWMFullscreen, NetActiveWindow, NetWMStrutPartial,
+       NetWMFullscreen, NetActiveWindow,
        NetWMWindowType, NetWMWindowTypeDialog,
        NetClientList,
        NetLast };
