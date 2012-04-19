@@ -2819,6 +2819,7 @@ ST_TARGET(View) {
 }
 
 int main (int argc, char *argv[]) {
+    XInitThreads();
     if (argc == 2 && !strcmp("-v", argv[1]))
         die("ProperWM "VERSION", 2012 Andrew Felske, 2006-2012 properwm authors -- see LICENSE for details\n");
     else if (argc != 1)
