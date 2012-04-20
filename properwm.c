@@ -202,6 +202,7 @@ static void setfocus (Client *c);
 static void setfullscreen (Client *c, bool fullscreen);
 static void setlayout (const Arg *arg);
 static void setmfact (const Arg *arg);
+static bool setstrut (Monitor *m, int pos, int px, int mode);
 static void setup (void);
 static void showhide (Client *c);
 static void sigchld (int unused);
@@ -231,8 +232,8 @@ static void updatewindowtype (Client *c);
 static void updatetitle (Client *c);
 static void updatewmhints (Client *c);
 static void view (const Arg *arg);
-static Client *wintoclient (Window w);
-static Monitor *wintomon (Window w);
+static Client* wintoclient (Window w);
+static Monitor* wintomon (Window w);
 static int xerror (Display *dpy, XErrorEvent *ee);
 static int xerrordummy (Display *dpy, XErrorEvent *ee);
 static int xerrorstart (Display *dpy, XErrorEvent *ee);
@@ -246,9 +247,9 @@ static ST_TARGET(ClientName);
 static ST_TARGET(CurrentLayout);
 static ST_TARGET(CurrentMonitor);
 static ST_TARGET(CurrentTag);
+static ST_TARGET(SetStrut);
 static ST_TARGET(ToggleBar);
 static ST_TARGET(ToggleBarPosition);
-static ST_TARGET(ToggleStrut);
 static ST_TARGET(ToggleView);
 static ST_TARGET(View);
 
@@ -1790,13 +1791,64 @@ void setlayout (const Arg *arg) {
 void setmfact (const Arg *arg) {
     float f;
 
-    if (!arg || !selmon->lts[selmon->curtag]->arrange)
+    if (arg == NULL || selmon->lts[selmon->curtag]->arrange == NULL)
         return;
+
     f = arg->f < 1.0 ? arg->f + selmon->mfacts[selmon->curtag] : arg->f - 1.0;
+
     if (f < 0.1 || f > 0.9)
         return;
+
     selmon->mfacts[selmon->curtag] = f;
     arrange(selmon);
+}
+
+bool setstrut(Monitor *m, int pos, int px, int mode) {
+    if (pos >= 4)
+        return false;
+
+    if (mode < -1 || mode > 1)
+        return false;
+
+    bool iter;
+    int newpx;
+
+    iter = (m == NULL);
+    if (m == NULL)
+        m = mons;
+
+    if (mode == -1)
+        newpx = m->struts[pos] - px;
+    else if (mode == 0)
+        newpx  = px;
+    else if (mode == 1)
+        newpx = m->struts[pos] + px;
+
+    if (newpx < 0 || (pos < 2 && newpx > m->mh/2) || (pos < 4 && newpx > m->mw/2))
+        return false;
+
+    if (iter) {
+        for (m = mons; m != NULL; m = m->next) {
+            if (mode == -1)
+                m->struts[pos] -= px;
+            else if (mode == 0)
+                m->struts[pos] = px;
+            else if (mode == 1);
+                m->struts[pos] += px;
+        }
+    } else {
+        if (mode == 0)
+            m->struts[pos] = px;
+        else if (mode == -1)
+            m->struts[pos] -= px;
+        else if (mode == 1)
+            m->struts[pos] += px;
+    }
+
+    updatestruts(m);
+    arrange(m);
+
+    return true;
 }
 
 void setup (void) {
@@ -2373,14 +2425,17 @@ bool updategeom (void) {
         XineramaScreenInfo *unique = NULL;
 
         for (n = 0, m = mons; m; m = m->next, n++);
+
         /* only consider unique geometries as separate screens */
         if (!(unique = (XineramaScreenInfo *)malloc(sizeof(XineramaScreenInfo) * nn)))
             die("fatal: could not malloc() %u bytes\n", sizeof(XineramaScreenInfo) * nn);
         for (i = 0, j = 0; i < nn; i++)
             if (isuniquegeom(unique, j, &info[i]))
                 memcpy(&unique[j++], &info[i], sizeof(XineramaScreenInfo));
+
         XFree(info);
         nn = j;
+
         if (n <= nn) {
             for(i = 0; i < (nn - n); i++) { /* new monitors available */
                 for(m = mons; m && m->next; m = m->next);
@@ -2417,6 +2472,7 @@ bool updategeom (void) {
                 cleanupmon(m);
             }
         }
+
         free(unique);
     }
     else
@@ -2678,9 +2734,9 @@ void* init_remote (void* arg) {
     st_map_set(stn->map, "GET", "/CurrentLayout", CurrentLayout);
     st_map_set(stn->map, "GET", "CurrentMonitor", CurrentMonitor);
     st_map_set(stn->map, "GET", "/CurrentTag", CurrentTag);
+    st_map_set(stn->map, "POST", "/SetStrut", SetStrut);
     st_map_set(stn->map, "POST", "/ToggleBar", ToggleBar);
     st_map_set(stn->map, "POST", "/ToggleBarPosition", ToggleBarPosition);
-    st_map_set(stn->map, "POST", "/ToggleStrut", ToggleStrut);
     st_map_set(stn->map, "POST", "/ToggleView", ToggleView);
     st_map_set(stn->map, "POST", "/View", View);
 
@@ -2721,6 +2777,65 @@ ST_TARGET(CurrentTag) {
     free(s);
 }
 
+ST_TARGET(SetStrut) {
+    char* mstr;
+    char* posstr;
+    char* pxstr;
+
+    int mode;
+    int mon;
+    int pos;
+    int px;
+
+    int mi;
+    Monitor* m;
+    bool succ;
+
+    mstr = st_pkt_get_kwarg(req, "mon");
+    posstr = st_pkt_get_kwarg(req, "pos");
+    pxstr = st_pkt_get_kwarg(req, "px");
+
+    if (mstr != NULL && posstr != NULL && pxstr != NULL) {
+        if (pxstr[0] == '-') {
+            mode = -1;
+            pxstr++;
+        } else if (pxstr[0] == '+') {
+            mode = 1;
+            pxstr++;
+        } else
+            mode = 0;
+
+        mon = strtol(mstr, NULL, 10);
+        pos = strtol(posstr, NULL, 10);
+        px = strtol(pxstr, NULL, 10);
+
+        mi = 0;
+        m = mons;
+
+        while (mi < mon) {
+            if (m->next != NULL) {
+                m = m->next;
+                mi++;
+            }
+        }
+
+        if (mi == mon && pos < 4) {
+            XLockDisplay(dpy);
+            succ = setstrut(m, pos, px, mode);
+            XUnlockDisplay(dpy);
+
+            if (succ)
+                st_pkt_append(rsp, "<3");
+            else
+                st_pkt_append(rsp, "</3");
+        } else
+            st_pkt_append(rsp, "</3>");
+    } else
+        st_pkt_append(rsp, "</3>");
+
+    st_pkt_send(rsp, conn);
+}
+
 ST_TARGET(ToggleBar) {
     XLockDisplay(dpy);
     togglebar(NULL);
@@ -2736,40 +2851,6 @@ ST_TARGET(ToggleBarPosition) {
     XUnlockDisplay(dpy);
 
     st_pkt_append(rsp, "<3");
-    st_pkt_send(rsp, conn);
-}
-
-ST_TARGET(ToggleStrut) {
-    char* posstr;
-    char* pxstr;
-
-    int pos;
-    int px;
-
-    bool nottoobig;
-
-    posstr = st_pkt_get_kwarg(req, "pos");
-    pxstr = st_pkt_get_kwarg(req, "px");
-
-    if (posstr != NULL && pxstr != NULL) {
-        pos = strtol(posstr, NULL, 10);
-        px = strtol(pxstr, NULL, 10);
-
-        nottoobig = (pos < 2 && px < selmon->mh/2) || (pos < 4 && px < selmon->mw/2);
-
-        if (pos < 4 && nottoobig) {
-            XLockDisplay(dpy);
-            selmon->struts[pos] = px;
-            updatestruts(selmon);
-            arrange(selmon);
-            XUnlockDisplay(dpy);
-
-            st_pkt_append(rsp, "<3");
-        } else
-            st_pkt_append(rsp, "</3>");
-    } else
-        st_pkt_append(rsp, "</3>");
-
     st_pkt_send(rsp, conn);
 }
 
