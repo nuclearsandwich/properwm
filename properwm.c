@@ -1,5 +1,3 @@
-#include <air/proto/st.h>
-
 #include <errno.h>
 #include <locale.h>
 
@@ -131,7 +129,6 @@ typedef struct {
     int monitor;
 } Rule;
 
-/* function declarations */
 static void applyrules (Client *c);
 static bool applysizehints (Client *c, int *x, int *y, int *w, int *h, bool interact);
 static void arrange (Monitor *m);
@@ -147,12 +144,12 @@ static void clientmessage (XEvent *e);
 static void configure (Client *c);
 static void configurenotify (XEvent *e);
 static void configurerequest (XEvent *e);
-static Monitor *createmon (void);
+static Monitor* createmon (void);
 static void destroynotify (XEvent *e);
 static void detach (Client *c);
 static void detachstack (Client *c);
 static void die (const char *errstr, ...);
-static Monitor *dirtomon (int dir);
+static Monitor* dirtomon (int dir);
 static void drawbar (Monitor *m);
 static void drawbars (void);
 static void drawsquare (bool filled, bool empty, bool invert, unsigned long col[ColLast]);
@@ -179,15 +176,15 @@ static void maprequest (XEvent *e);
 static void monocle (Monitor *m);
 static void motionnotify (XEvent *e);
 static void movemouse (const Arg *arg);
-static Client *nexttiled (Client *c);
+static Client* nexttiled (Client *c);
 static int ntiled (Monitor *m);
 static void pop (Client *);
-static Client *prevtiled (Client *c);
+static Client* prevtiled (Client *c);
 static void propertynotify (XEvent *e);
 static void pushdown (const Arg *arg);
 static void pushup (const Arg *arg);
 static void quit (const Arg *arg);
-static Monitor *recttomon (int x, int y, int w, int h);
+static Monitor* recttomon (int x, int y, int w, int h);
 static void resetnmaster (const Arg *arg);
 static void resize (Client *c, int x, int y, int w, int h, bool interact);
 static void resizeclient (Client *c, int x, int y, int w, int h);
@@ -202,7 +199,7 @@ static void setfocus (Client *c);
 static void setfullscreen (Client *c, bool fullscreen);
 static void setlayout (const Arg *arg);
 static void setmfact (const Arg *arg);
-static bool setstrut (Monitor *m, int pos, int px, int mode);
+static bool setstrut (Monitor *m, int pos, int px);
 static void setup (void);
 static void showhide (Client *c);
 static void sigchld (int unused);
@@ -239,21 +236,6 @@ static int xerrordummy (Display *dpy, XErrorEvent *ee);
 static int xerrorstart (Display *dpy, XErrorEvent *ee);
 static void zoom (const Arg *arg);
 
-/* server targets */
-
-static void* init_remote (void* arg);
-
-static ST_TARGET(ClientName);
-static ST_TARGET(CurrentLayout);
-static ST_TARGET(CurrentMonitor);
-static ST_TARGET(CurrentTag);
-static ST_TARGET(SetStrut);
-static ST_TARGET(ToggleBar);
-static ST_TARGET(ToggleBarPosition);
-static ST_TARGET(ToggleView);
-static ST_TARGET(View);
-
-/* variables */
 static const char broken[] = "broken";
 static char stext[256];
 static int screen;
@@ -285,14 +267,13 @@ static DC dc;
 static Monitor *mons = NULL, *selmon = NULL;
 static Window root;
 
-/* configuration, allows nested code to access above variables */
 #include "config.h"
 
 typedef enum StrutPosition {
-    POS_TOP,
-    POS_BOTTOM,
-    POS_LEFT,
-    POS_RIGHT
+    STRUT_TOP,
+    STRUT_BOTTOM,
+    STRUT_LEFT,
+    STRUT_RIGHT
 } StrutPosition;
 
 struct Monitor {
@@ -327,8 +308,7 @@ struct Monitor {
     Monitor *next;
 };
 
-/* compile-time check to make sure all tags fit into an unsigned int bit array. */
-struct NumTags { char limitexceeded[LENGTH(tags) > 31 ? -1 : 1]; };
+struct CheckTags { char limitexceeded[LENGTH(tags) > 31 ? -1 : 1]; };
 
 void applyrules (Client *c) {
     const char *class, *instance;
@@ -717,7 +697,7 @@ Monitor* createmon (void) {
     int i;
 
     for (i = 0; i < 4; i++) {
-        if (m->showbar && ((i == POS_TOP && m->topbar) || (i == POS_BOTTOM && m->topbar == false)))
+        if (m->showbar && ((i == STRUT_TOP && m->topbar) || (i == STRUT_BOTTOM && m->topbar == false)))
             m->struts[i] = bh;
         else
             m->struts[i] = 0;
@@ -1120,14 +1100,16 @@ void initfont (const char *fontstr) {
             fprintf(stderr, "properwm: missing fontset: %s\n", missing[n]);
         XFreeStringList(missing);
     }
+
     if (dc.font.set) {
-        XFontStruct **xfonts;
-        char **font_names;
+        XFontStruct** xfonts;
+        char** font_names;
 
         dc.font.ascent = dc.font.descent = 0;
         XExtentsOfFontSet(dc.font.set);
         n = XFontsOfFontSet(dc.font.set, &xfonts, &font_names);
-        while(n--) {
+
+        while (n--) {
             dc.font.ascent = MAX(dc.font.ascent, (*xfonts)->ascent);
             dc.font.descent = MAX(dc.font.descent,(*xfonts)->descent);
             xfonts++;
@@ -1648,18 +1630,21 @@ void restack (Monitor *m) {
 }
 
 void run (void) {
+    int ret;
     XEvent ev;
 
     XSync(dpy, false);
 
-    pthread_t sthr;
-    pthread_create(&sthr, NULL, init_remote, NULL);
+    while (running) {
+        ret = XNextEvent(dpy, &ev);
 
-    while (running && XNextEvent(dpy, &ev) == 0) {
-        XLockDisplay(dpy);
+        if (ret != 0) {
+            running = false;
+            break;
+        }
+
         if (handler[ev.type])
             handler[ev.type](&ev);
-        XUnlockDisplay(dpy);
     }
 }
 
@@ -1803,50 +1788,31 @@ void setmfact (const Arg *arg) {
     arrange(selmon);
 }
 
-bool setstrut(Monitor *m, int pos, int px, int mode) {
+bool setstrut (Monitor *m, int pos, int px) {
     if (pos >= 4)
         return false;
 
-    if (mode < -1 || mode > 1)
-        return false;
-
     bool iter;
-    int newpx;
 
     iter = (m == NULL);
-    if (m == NULL)
-        m = mons;
 
-    if (mode == -1)
-        newpx = m->struts[pos] - px;
-    else if (mode == 0)
-        newpx  = px;
-    else if (mode == 1)
-        newpx = m->struts[pos] + px;
-
-    if (newpx < 0 || (pos < 2 && newpx > m->mh/2) || (pos < 4 && newpx > m->mw/2))
-        return false;
+    if (px <= 0)
+        px = 0;
+    else if (pos < 2 && px > m->mh/4)
+        px = m->mh/4;
+    else if (pos < 4 && px > m->mw/4)
+        px = m->mw/4;
 
     if (iter) {
-        for (m = mons; m != NULL; m = m->next) {
-            if (mode == -1)
-                m->struts[pos] -= px;
-            else if (mode == 0)
-                m->struts[pos] = px;
-            else if (mode == 1);
-                m->struts[pos] += px;
-        }
-    } else {
-        if (mode == 0)
+        for (m = mons; m != NULL; m = m->next)
             m->struts[pos] = px;
-        else if (mode == -1)
-            m->struts[pos] -= px;
-        else if (mode == 1)
-            m->struts[pos] += px;
-    }
+    } else
+        m->struts[pos] = px;
 
     updatestruts(m);
-    arrange(m);
+
+    if (running)
+        arrange(m);
 
     return true;
 }
@@ -2185,7 +2151,7 @@ void tile (Monitor *m) {
 void togglebar (const Arg *arg) {
     selmon->showbar = selmon->showbar == false;
 
-    selmon->struts[(selmon->topbar ? POS_TOP : POS_BOTTOM)] = (selmon->showbar ? bh : 0);
+    selmon->struts[(selmon->topbar ? STRUT_TOP : STRUT_BOTTOM)] = (selmon->showbar ? bh : 0);
     updatestruts(selmon);
 
     if (selmon->showbar)
@@ -2200,11 +2166,10 @@ void togglebarpos (const Arg *arg) {
     if (selmon->showbar == false)
         return;
 
-    selmon->struts[(selmon->topbar ? POS_TOP : POS_BOTTOM)] -= bh;
-
+    selmon->struts[(selmon->topbar ? STRUT_TOP : STRUT_BOTTOM)] = 0;
     selmon->topbar = selmon->topbar == false;
+    selmon->struts[(selmon->topbar ? STRUT_TOP : STRUT_BOTTOM)] += bh;
 
-    selmon->struts[(selmon->topbar ? POS_TOP : POS_BOTTOM)] += bh;
     updatestruts(selmon);
 
     if (selmon->topbar)
@@ -2243,6 +2208,9 @@ void togglefloating (const Arg *arg) {
         setfullscreen(selmon->sel, false);
 
     arrange(selmon);
+}
+
+void toggleshell (const Arg *arg) {
 }
 
 void toggletag (const Arg *arg) {
@@ -2334,22 +2302,24 @@ void unmapnotify (XEvent *e) {
 
 void updatebars (void) {
     Monitor *m;
+
     XSetWindowAttributes wa = {
         .override_redirect = true,
         .background_pixmap = ParentRelative,
         .event_mask = ButtonPressMask|ExposureMask
     };
+
     for (m = mons; m; m = m->next) {
         if (m->barwin)
             continue;
 
-        m->barwin = XCreateWindow(dpy, root, m->wx, m->by, m->ww, bh, 0, DefaultDepth(dpy, screen),
+        m->barwin = XCreateWindow(dpy, root, m->mx, m->by, m->mw, bh, 0, DefaultDepth(dpy, screen),
                                   CopyFromParent, DefaultVisual(dpy, screen),
                                   CWOverrideRedirect|CWBackPixmap|CWEventMask, &wa);
 
-
         XDefineCursor(dpy, m->barwin, cursor[CurNormal]);
         XMapRaised(dpy, m->barwin);
+        setstrut(m, STRUT_TOP, bh);
     }
 }
 
@@ -2562,38 +2532,34 @@ void updatestruts (Monitor *m) {
     int i;
     int px;
 
-    m->wy = m->my;
     m->wx = m->mx;
-    m->wh = m->mh;
+    m->wy = m->my;
+
     m->ww = m->mw;
+    m->wh = m->mh;
 
     for (i = 0; i < 4; i++) {
         px = m->struts[i];
 
-        if (i == POS_TOP) {
+        if (i == STRUT_TOP) {
+            m->wh -= px;
             m->wy += px;
-            m->wh -= px;
         }
-        else if (i == POS_BOTTOM)
+        else if (i == STRUT_BOTTOM)
             m->wh -= px;
-        else {
-            if (i == POS_LEFT) {
-                m->wx += px;
-                m->ww -= px;
-                XMoveWindow(dpy, m->barwin, m->wx, m->by);
-            }
-            else if (i == POS_RIGHT)
-                m->ww -= px;
-
-            XResizeWindow(dpy, m->barwin, m->ww, bh);
+        else if (i == STRUT_LEFT) {
+            m->ww -= px;
+            m->wx += px;
         }
+        else if (i == STRUT_RIGHT)
+            m->ww -= px;
     }
 }
 
 void updatetitle (Client *c) {
     if (!gettextprop(c->win, netatom[NetWMName], c->name, sizeof c->name))
         gettextprop(c->win, XA_WM_NAME, c->name, sizeof c->name);
-    if (c->name[0] == '\0') /* hack to mark broken clients */
+    if (c->name[0] == '\0')
         strcpy(c->name, broken);
 }
 
@@ -2724,205 +2690,25 @@ void zoom (const Arg *arg) {
     pop(c);
 }
 
-void* init_remote (void* arg) {
-    XInitThreads();
-
-    st_node* stn = st_node_new(1100);
-    stn->process_type = ST_QUEUED;
-
-    st_map_set(stn->map, "GET", "/ClientName", ClientName);
-    st_map_set(stn->map, "GET", "/CurrentLayout", CurrentLayout);
-    st_map_set(stn->map, "GET", "CurrentMonitor", CurrentMonitor);
-    st_map_set(stn->map, "GET", "/CurrentTag", CurrentTag);
-    st_map_set(stn->map, "POST", "/SetStrut", SetStrut);
-    st_map_set(stn->map, "POST", "/ToggleBar", ToggleBar);
-    st_map_set(stn->map, "POST", "/ToggleBarPosition", ToggleBarPosition);
-    st_map_set(stn->map, "POST", "/ToggleView", ToggleView);
-    st_map_set(stn->map, "POST", "/View", View);
-
-    air_node_start(&stn->base);
-
-    return NULL;
-}
-
-ST_TARGET(ClientName) {
-    if (selmon->sel == NULL)
-        st_pkt_append(rsp, "</3");
-    else
-        st_pkt_append(rsp, selmon->sel->name);
-
-    st_pkt_send(rsp, conn);
-}
-
-ST_TARGET(CurrentLayout) {
-    st_pkt_append(rsp, (char*) selmon->lts[selmon->curtag]->symbol);
-    st_pkt_send(rsp, conn);
-}
-
-ST_TARGET(CurrentMonitor) {
-    char* mstr = malloc(16);
-    sprintf(mstr, "%d", selmon->num);
-    st_pkt_append(rsp, mstr);
-    st_pkt_send(rsp, conn);
-    free(mstr);
-}
-
-ST_TARGET(CurrentTag) {
-    char* s = malloc(16);
-    sprintf(s, "%d", selmon->curtag);
-
-    st_pkt_append(rsp, s);
-    st_pkt_send(rsp, conn);
-
-    free(s);
-}
-
-ST_TARGET(SetStrut) {
-    char* mstr;
-    char* posstr;
-    char* pxstr;
-
-    int mode;
-    int mon;
-    int pos;
-    int px;
-
-    int mi;
-    Monitor* m;
-    bool succ;
-
-    mstr = st_pkt_get_kwarg(req, "mon");
-    posstr = st_pkt_get_kwarg(req, "pos");
-    pxstr = st_pkt_get_kwarg(req, "px");
-
-    if (mstr != NULL && posstr != NULL && pxstr != NULL) {
-        if (pxstr[0] == '-') {
-            mode = -1;
-            pxstr++;
-        } else if (pxstr[0] == '+') {
-            mode = 1;
-            pxstr++;
-        } else
-            mode = 0;
-
-        mon = strtol(mstr, NULL, 10);
-        pos = strtol(posstr, NULL, 10);
-        px = strtol(pxstr, NULL, 10);
-
-        mi = 0;
-        m = mons;
-
-        while (mi < mon) {
-            if (m->next != NULL) {
-                m = m->next;
-                mi++;
-            }
-        }
-
-        if (mi == mon && pos < 4) {
-            XLockDisplay(dpy);
-            succ = setstrut(m, pos, px, mode);
-            XUnlockDisplay(dpy);
-
-            if (succ)
-                st_pkt_append(rsp, "<3");
-            else
-                st_pkt_append(rsp, "</3");
-        } else
-            st_pkt_append(rsp, "</3>");
-    } else
-        st_pkt_append(rsp, "</3>");
-
-    st_pkt_send(rsp, conn);
-}
-
-ST_TARGET(ToggleBar) {
-    XLockDisplay(dpy);
-    togglebar(NULL);
-    XUnlockDisplay(dpy);
-
-    st_pkt_append(rsp, "<3");
-    st_pkt_send(rsp, conn);
-}
-
-ST_TARGET(ToggleBarPosition) {
-    XLockDisplay(dpy);
-    togglebarpos(NULL);
-    XUnlockDisplay(dpy);
-
-    st_pkt_append(rsp, "<3");
-    st_pkt_send(rsp, conn);
-}
-
-ST_TARGET(ToggleView) {
-    char* tstr;
-    int t;
-
-    tstr = st_pkt_get_kwarg(req, "tag");
-
-    if (tstr != NULL) {
-        t = strtol(tstr, NULL, 10);
-
-        if (t < LENGTH(tags)) {
-            Arg arg = { .ui = 1 << t };
-
-            XLockDisplay(dpy);
-            toggleview(&arg);
-            XUnlockDisplay(dpy);
-
-            st_pkt_append(rsp, "<3");
-        }
-        else
-            st_pkt_append(rsp, "</3");
-    }
-    else
-        st_pkt_append(rsp, "</3");
-
-    st_pkt_send(rsp, conn);
-}
-
-ST_TARGET(View) {
-    char* tstr;
-    int t;
-
-    tstr = st_pkt_get_kwarg(req, "tag");
-
-    if (tstr != NULL) {
-        t = strtol(tstr, NULL, 10);
-
-        if (t < LENGTH(tags)) {
-            Arg arg = { .ui = 1 << t };
-
-            XLockDisplay(dpy);
-            view(&arg);
-            XUnlockDisplay(dpy);
-
-            st_pkt_append(rsp, "<3");
-        }
-        else
-            st_pkt_append(rsp, "</3");
-    }
-    else
-        st_pkt_append(rsp, "</3");
-
-    st_pkt_send(rsp, conn);
-}
-
 int main (int argc, char *argv[]) {
-    XInitThreads();
+    dpy = XOpenDisplay(NULL);
+
+    if (dpy == NULL)
+        die("properwm: cannot open display");
+
     if (argc == 2 && !strcmp("-v", argv[1]))
-        die("ProperWM "VERSION", 2012 Andrew Felske, 2006-2012 properwm authors -- see LICENSE for details\n");
+        die("ProperWM "VERSION", 2012 speeddefrost, 2006-2012 dwm authors -- see LICENSE for details\n");
     else if (argc != 1)
         die("usage: properwm [-v]\n");
+
     if (!setlocale(LC_CTYPE, "") || !XSupportsLocale())
         fputs("warning: no locale support\n", stderr);
-    if (!(dpy = XOpenDisplay(NULL)))
-        die("properwm: cannot open display\n");
+
     checkotherwm();
     setup();
     scan();
     run();
     cleanup();
-    XCloseDisplay(dpy);
+
     return EXIT_SUCCESS;
 }
