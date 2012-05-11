@@ -2,15 +2,20 @@
 
 /* appearance */
 static const char font[]            = "-*-terminus-medium-r-*-*-16-*-*-*-*-*-*-*";
-static const char normbordercolor[] = "#3A3A3A";
+
+static const char normbordercolor[] = "#383838";
+static const char selbordercolor[]  = "#00FFFF";
+
 static const char normbgcolor[]     = "#111111";
-static const char normfgcolor[]     = "#777777";
-static const char selbordercolor[]  = "#FF0000";
 static const char selbgcolor[]      = "#222222";
+
+static const char normfgcolor[]     = "#777777";
 static const char selfgcolor[]      = "#DDDDDD";
+
 static const unsigned int borderpx  = 1;        /* window border width */
 static const unsigned int padding   = 10;       /* window padding */
 static const unsigned int snap      = 10;       /* snap threshold */
+
 static const bool smartborders      = true;     /* smart borders */
 static const bool showbar           = true;     /* bar visibility */
 static const bool topbar            = true;     /* place bar at top (false = bottom) */
@@ -26,7 +31,6 @@ static const Rule rules[] = {
      */
     /* class      instance    title       tags mask     isfloating   monitor */
     { "Gimp",     NULL,       NULL,       0,            true,        -1 },
-    { "Firefox",  NULL,       NULL,       1 << 8,       false,       -1 },
 };
 
 /* layout(s) */
