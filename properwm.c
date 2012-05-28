@@ -2210,31 +2210,16 @@ void togglefloating (const Arg *arg) {
     arrange(selmon);
 }
 
-void toggleshell (const Arg *arg) {
-}
-
 void toggletag (const Arg *arg) {
-    unsigned int newtags, i;
+    unsigned int newtags;
 
-    if (!selmon->sel)
+    if (selmon->sel == NULL)
         return;
 
     newtags = selmon->sel->tags ^ (arg->ui & TAGMASK);
 
     if (newtags) {
         selmon->sel->tags = newtags;
-
-        if (newtags == ~0) {
-            selmon->prevtag = selmon->curtag;
-            selmon->curtag = 0;
-        }
-
-        if (!(newtags & 1 << (selmon->curtag - 1))) {
-            selmon->prevtag = selmon->curtag;
-            for (i = 0; (newtags & 1 << i) == 0; i++);
-            selmon->curtag = i + 1;
-        }
-
         focus(NULL);
         arrange(selmon);
     }
@@ -2270,6 +2255,7 @@ void unmanage (Client *c, bool destroyed) {
     /* The server grab construct avoids race conditions. */
     detach(c);
     detachstack(c);
+
     if (destroyed == false) {
         wc.border_width = c->oldbw;
         XGrabServer(dpy);
@@ -2289,10 +2275,10 @@ void unmanage (Client *c, bool destroyed) {
 }
 
 void unmapnotify (XEvent *e) {
-    Client *c;
     XUnmapEvent *ev = &e->xunmap;
+    Client *c = wintoclient(ev->window);
 
-    if ((c = wintoclient(ev->window))) {
+    if (c != NULL) {
         if (ev->send_event)
             setclientstate(c, WithdrawnState);
         else
