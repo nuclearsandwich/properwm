@@ -1176,7 +1176,7 @@ monocle(Monitor *m) {
             n++;
 
     if (n > 0) { /* override layout symbol */
-        snprintf(m->ltsymbol, sizeof m->ltsymbol, "[%d]", n);
+        snprintf(m->ltsymbol, sizeof m->ltsymbol, "%d", n);
         updatebarlayout(m);
     }
 
