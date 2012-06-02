@@ -312,6 +312,7 @@ struct Monitor {
     Bar* bar;
     TagLabel* lb_tags;
 
+    Client* focus[LENGTH(tags)];
     float mfacts[LENGTH(tags)];
     int nmasters[LENGTH(tags)];
     const Layout *lts[LENGTH(tags)];
@@ -802,6 +803,7 @@ Monitor* createmon (void) {
     updatestruts(m);
 
     for (i = 0; i < LENGTH(tags); i++) {
+        m->focus[i] = NULL;
         m->lts[i] = &layouts[0];
         m->mfacts[i] = mfact;
         m->nmasters[i] = nmaster;
@@ -909,6 +911,7 @@ void focus (Client *c) {
     }
 
     selmon->sel = c;
+    selmon->focus[selmon->curtag] = c;
 
     updatebartags(selmon);
     updatebartitle(selmon);
@@ -2727,7 +2730,7 @@ void view (const Arg *arg) {
         selmon->prevtag = oldcur;
     }
 
-    focus(NULL);
+    focus(selmon->focus[selmon->curtag]);
     updatebartags(selmon);
     arrange(selmon);
 }
