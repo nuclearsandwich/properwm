@@ -2732,6 +2732,7 @@ void view (const Arg *arg) {
 
     focus(selmon->focus[selmon->curtag]);
     updatebartags(selmon);
+    updatebarlayout(selmon);
     arrange(selmon);
 }
 
