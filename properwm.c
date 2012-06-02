@@ -275,6 +275,7 @@ typedef struct TagLabel {
 
     bool empty;
     bool selected;
+    bool underline;
     bool urgent;
 
     struct {
@@ -362,14 +363,11 @@ void _draw_tag (TagLabel* t) {
     }
 
     cairo_t* cr = cairo_create(t->base.cs);
-    cairo_save(cr);
 
     loft_cairo_set_rgba(cr, bg);
 
     cairo_rectangle(cr, 0, 0, t->base.width, t->base.height);
     cairo_fill(cr);
-
-    loft_cairo_set_rgba(cr, fg);
 
     cairo_select_font_face(cr, loftenv.font, CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
     cairo_set_font_size(cr, loftenv.font_size);
@@ -380,15 +378,19 @@ void _draw_tag (TagLabel* t) {
     cairo_font_extents_t f_ext;
     cairo_font_extents(cr, &f_ext);
 
-    cairo_move_to (
-        cr,
-        (t->base.width / 2) - ((ext.width / 2) + ext.x_bearing),
-        (t->base.height / 2) - ((f_ext.height / 2) + ext.y_bearing)
-    );
+    int x = (t->base.width / 2) - ((ext.width / 2) + ext.x_bearing);
+    int y = (t->base.height / 2) - ((f_ext.height / 2) + ext.y_bearing);
 
+    loft_cairo_set_rgba(cr, fg);
+
+    cairo_move_to(cr, x, y);
     cairo_show_text(cr, tags[t->num]);
 
-    cairo_restore(cr);
+    if (t->underline) {
+        cairo_rectangle(cr, 0, 0, t->base.width, 1);
+        cairo_fill(cr);
+    }
+
     cairo_destroy(cr);
 }
 
@@ -907,6 +909,8 @@ void focus (Client *c) {
     }
 
     selmon->sel = c;
+
+    updatebartags(selmon);
     updatebartitle(selmon);
 }
 
@@ -1990,8 +1994,8 @@ void stack (Monitor *m) {
 void tag (const Arg *arg) {
     if (selmon->sel && arg->ui & TAGMASK) {
         selmon->sel->tags = arg->ui & TAGMASK;
-        updatebartags(selmon);
         focus(NULL);
+        updatebartags(selmon);
         arrange(selmon);
     }
 }
@@ -2174,7 +2178,6 @@ void toggletag (const Arg *arg) {
 
     if (newtags) {
         selmon->sel->tags = newtags;
-        updatebartags(selmon);
         focus(NULL);
         arrange(selmon);
     }
@@ -2185,7 +2188,6 @@ void toggleview (const Arg *arg) {
 
     if (newtagset) {
         selmon->tagset[selmon->seltags] = newtagset;
-        updatebartags(selmon);
         focus(NULL);
         arrange(selmon);
     }
@@ -2205,7 +2207,7 @@ void unfocus (Client *c, bool setfocus) {
 }
 
 void unmanage (Client *c, bool destroyed) {
-    Monitor *m = c->mon;
+    Monitor* m = c->mon;
     XWindowChanges wc;
 
     /* The server grab construct avoids race conditions. */
@@ -2297,6 +2299,7 @@ void updatebars (void) {
 
             t->empty = true;
             t->selected = false;
+            t->underline = false;
             t->urgent = false;
 
             // set tag colors
@@ -2389,6 +2392,8 @@ void updatebartags (Monitor* m) {
         t = m->lb_tags + i;
 
         t->selected = m->tagset[m->seltags] & mask;
+        t->underline = tagline && m->sel != NULL && m->sel->tags & mask;
+
         t->urgent = false;
 
         for (c = m->clients; c != NULL; c = c->next) {
@@ -2409,7 +2414,7 @@ void updatebartags (Monitor* m) {
 }
 
 inline void updatebartitle (Monitor* m) {
-    loft_label_set_text(&m->bar->lb_title, m->sel->name);
+    loft_label_set_text(&m->bar->lb_title, m->sel != NULL ? m->sel->name : NULL);
 }
 
 void updateborders (Monitor *m) {
@@ -2688,12 +2693,12 @@ void updatewmhints (Client *c) {
         else
             c->isurgent = (wmh->flags & XUrgencyHint) ? true : false;
 
-        updatebartags(c->mon);
-
         if (wmh->flags & InputHint)
             c->neverfocus = !wmh->input;
         else
             c->neverfocus = false;
+
+        updatebartags(c->mon);
 
         XFree(wmh);
     }
@@ -2722,9 +2727,8 @@ void view (const Arg *arg) {
         selmon->prevtag = oldcur;
     }
 
-    updatebartags(selmon);
-
     focus(NULL);
+    updatebartags(selmon);
     arrange(selmon);
 }
 

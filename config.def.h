@@ -50,6 +50,7 @@ static unsigned int snap = 10;      /* snap threshold */
 
 static bool smartborders = true;    /* smart borders */
 static bool showbar = true;         /* bar visibility */
+static bool tagline = true;         /* draw line over tags selected client appears on */
 static bool topbar = true;          /* place bar at top (false = bottom) */
 static bool ffm = false;            /* focus follows mouse */
 
@@ -57,7 +58,7 @@ static bool ffm = false;            /* focus follows mouse */
 // TAGS
 //
 
-static char* tags[] = { "1", "2", "3", "4", "5", "6", "7", "8", "9" };
+static char* tags[] = { "M", "A1", "A2", "A3", "A4", "E1", "E2", "E3", "E4" };
 
 //
 // WINDOW RULES
