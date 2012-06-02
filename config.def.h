@@ -19,11 +19,11 @@ static const char selected_border_color[] = "#ABCC00";
 
 static const char base_color[] = "#000000CC";
 
-static const char empty_tag_bg_color[] = "#000000CC";
-static const char empty_tag_fg_color[] = "#666666";
+static const char unused_tag_bg_color[] = "#000000CC";
+static const char unused_tag_fg_color[] = "#666666";
 
 static const char normal_tag_bg_color[] = "#000000CC";
-static const char normal_tag_fg_color[] = "#3A6CA6";
+static const char normal_tag_fg_color[] = "#5E82AB";
 
 static const char selected_tag_bg_color[] = "#000000CC";
 static const char selected_tag_fg_color[] = "#AAAAAA";
@@ -58,7 +58,7 @@ static bool ffm = false;            /* focus follows mouse */
 // TAGS
 //
 
-static char* tags[] = { "M", "A1", "A2", "A3", "A4", "E1", "E2", "E3", "E4" };
+static char* tags[] = { "M1", "M2", "M3", "M4", "E5", "E6", "E7", "E8", "E9" };
 
 //
 // WINDOW RULES

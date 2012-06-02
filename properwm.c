@@ -273,13 +273,13 @@ typedef struct TagLabel {
 
     int num;
 
-    bool empty;
+    bool unused;
     bool selected;
     bool underline;
     bool urgent;
 
     struct {
-        LoftRGBAPair empty;
+        LoftRGBAPair unused;
         LoftRGBAPair normal;
         LoftRGBAPair selected;
         LoftRGBAPair urgent;
@@ -349,9 +349,9 @@ void _draw_tag (TagLabel* t) {
         bg = &t->style.selected.bg;
         fg = &t->style.selected.fg;
     }
-    else if (t->empty) {
-        bg = &t->style.empty.bg;
-        fg = &t->style.empty.fg;
+    else if (t->unused) {
+        bg = &t->style.unused.bg;
+        fg = &t->style.unused.fg;
     }
     else if (t->urgent) {
         bg = &t->style.urgent.bg;
@@ -2297,15 +2297,15 @@ void updatebars (void) {
 
             t->num = i;
 
-            t->empty = true;
+            t->unused = true;
             t->selected = false;
             t->underline = false;
             t->urgent = false;
 
             // set tag colors
 
-            loft_rgba_set_from_str(&t->style.empty.bg, (char*) empty_tag_bg_color);
-            loft_rgba_set_from_str(&t->style.empty.fg, (char*) empty_tag_fg_color);
+            loft_rgba_set_from_str(&t->style.unused.bg, (char*) unused_tag_bg_color);
+            loft_rgba_set_from_str(&t->style.unused.fg, (char*) unused_tag_fg_color);
 
             loft_rgba_set_from_str(&t->style.normal.bg, (char*) normal_tag_bg_color);
             loft_rgba_set_from_str(&t->style.normal.fg, (char*) normal_tag_fg_color);
@@ -2407,7 +2407,7 @@ void updatebartags (Monitor* m) {
             }
         }
 
-        t->empty = cc == 0;
+        t->unused = cc == 0;
 
         loft_widget_draw(&t->base);
     }
