@@ -269,8 +269,20 @@ typedef struct Bar {
 } Bar;
 
 typedef struct TagLabel {
-    LoftLabel base;
+    LoftWidget base;
+
     int num;
+
+    bool empty;
+    bool selected;
+    bool urgent;
+
+    struct {
+        LoftRGBAPair empty;
+        LoftRGBAPair normal;
+        LoftRGBAPair selected;
+        LoftRGBAPair urgent;
+    } style;
 } TagLabel;
 
 struct Monitor {
@@ -311,8 +323,8 @@ struct CheckTags { char limitexceeded[LENGTH(tags) > 31 ? -1 : 1]; };
 
 // SIGNAL CALLBACKS
 
-void _on_tag_pressed (TagLabel* tag_lb, LoftButtonEvent* be) {
-    Arg arg = { .ui = 1 << tag_lb->num};
+void _on_tag_pressed (TagLabel* t, LoftButtonEvent* be) {
+    Arg arg = { .ui = 1 << t->num};
 
     if (be->id == 1) {
         if (be->mask & MODKEY)
@@ -326,9 +338,58 @@ void _on_tag_pressed (TagLabel* tag_lb, LoftButtonEvent* be) {
         else
             toggleview(&arg);
     }
+}
 
-    arrange(selmon);
-    updatebartags(selmon);
+void _draw_tag (TagLabel* t) {
+    LoftRGBA* bg;
+    LoftRGBA* fg;
+
+    if (t->selected) {
+        bg = &t->style.selected.bg;
+        fg = &t->style.selected.fg;
+    }
+    else if (t->empty) {
+        bg = &t->style.empty.bg;
+        fg = &t->style.empty.fg;
+    }
+    else if (t->urgent) {
+        bg = &t->style.urgent.bg;
+        fg = &t->style.urgent.fg;
+    }
+    else {
+        bg = &t->style.normal.bg;
+        fg = &t->style.normal.fg;
+    }
+
+    cairo_t* cr = cairo_create(t->base.cs);
+    cairo_save(cr);
+
+    loft_cairo_set_rgba(cr, bg);
+
+    cairo_rectangle(cr, 0, 0, t->base.width, t->base.height);
+    cairo_fill(cr);
+
+    loft_cairo_set_rgba(cr, fg);
+
+    cairo_select_font_face(cr, loftenv.font, CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
+    cairo_set_font_size(cr, loftenv.font_size);
+
+    cairo_text_extents_t ext;
+    cairo_text_extents(cr, tags[t->num], &ext);
+
+    cairo_font_extents_t f_ext;
+    cairo_font_extents(cr, &f_ext);
+
+    cairo_move_to (
+        cr,
+        (t->base.width / 2) - ((ext.width / 2) + ext.x_bearing),
+        (t->base.height / 2) - ((f_ext.height / 2) + ext.y_bearing)
+    );
+
+    cairo_show_text(cr, tags[t->num]);
+
+    cairo_restore(cr);
+    cairo_destroy(cr);
 }
 
 // - - - - - - - - - - -
@@ -561,7 +622,7 @@ void cleanupmon (Monitor *mon) {
 
     int i;
     for (i = 0; i < LENGTH(tags); i++)
-        loft_widget_destroy(&(mon->lb_tags+i)->base.base);
+        loft_widget_destroy(&mon->lb_tags[i].base);
 
     free(mon->lb_tags);
 
@@ -585,6 +646,8 @@ void clearurgent (Client *c) {
     wmh->flags &= ~XUrgencyHint;
     XSetWMHints(dpy, c->win, wmh);
     XFree(wmh);
+
+    updatebartags(c->mon);
 }
 
 void clientmessage (XEvent *e) {
@@ -1925,6 +1988,7 @@ void stack (Monitor *m) {
 void tag (const Arg *arg) {
     if (selmon->sel && arg->ui & TAGMASK) {
         selmon->sel->tags = arg->ui & TAGMASK;
+        updatebartags(selmon);
         focus(NULL);
         arrange(selmon);
     }
@@ -1933,7 +1997,12 @@ void tag (const Arg *arg) {
 void tagmon (const Arg *arg) {
     if (selmon->sel == NULL || mons->next == NULL)
         return;
-    sendmon(selmon->sel, dirtomon(arg->i));
+
+    Monitor* newmon = dirtomon(arg->i);
+    sendmon(selmon->sel, newmon);
+
+    updatebartags(selmon);
+    updatebartags(newmon);
 }
 
 void tile (Monitor *m) {
@@ -2103,6 +2172,7 @@ void toggletag (const Arg *arg) {
 
     if (newtags) {
         selmon->sel->tags = newtags;
+        updatebartags(selmon);
         focus(NULL);
         arrange(selmon);
     }
@@ -2113,9 +2183,9 @@ void toggleview (const Arg *arg) {
 
     if (newtagset) {
         selmon->tagset[selmon->seltags] = newtagset;
+        updatebartags(selmon);
         focus(NULL);
         arrange(selmon);
-        updatebartags(selmon);
     }
 }
 
@@ -2173,6 +2243,13 @@ void unmapnotify (XEvent *e) {
 void updatebars (void) {
     Monitor *m;
 
+    int i;
+    TagLabel* t;
+
+    cairo_t* cr;
+    cairo_text_extents_t ext;
+    cairo_font_extents_t f_ext;
+
     for (m = mons; m; m = m->next) {
         if (m->bar != NULL)
             continue;
@@ -2202,32 +2279,60 @@ void updatebars (void) {
         loft_layout_attach(&m->bar->lt_main, &m->bar->lb_title.base, EXPAND_X | EXPAND_Y);
         loft_layout_attach(&m->bar->lt_main, &m->bar->lb_status.base, EXPAND_Y);
 
-        int i;
-        TagLabel* t;
-
         m->lb_tags = malloc(sizeof(TagLabel) * LENGTH(tags));
 
         for (i = 0; i < LENGTH(tags); i++) {
             t = m->lb_tags + i;
+
+            // init base
+
+            loft_widget_init(&t->base, "taglabel", 0);
+            t->base.draw_base = false;
+
+            // init defaults
+
             t->num = i;
 
-            loft_label_init(&t->base, ALIGN_CENTER, (char*) tags[i]);
-            loft_label_set_padding(&t->base, 7, 0);
-
-            t->base.base.draw_base = false;
+            t->empty = true;
+            t->selected = false;
+            t->urgent = false;
 
             // set tag colors
 
-            loft_rgba_set_from_str(&t->base.style.normal.bg, (char*) normal_tag_bg_color);
-            loft_rgba_set_from_str(&t->base.style.normal.fg, (char*) normal_tag_fg_color);
+            loft_rgba_set_from_str(&t->style.empty.bg, (char*) empty_tag_bg_color);
+            loft_rgba_set_from_str(&t->style.empty.fg, (char*) empty_tag_fg_color);
 
-            loft_rgba_set_from_str(&t->base.style.highlight.bg, (char*) selected_tag_bg_color);
-            loft_rgba_set_from_str(&t->base.style.highlight.fg, (char*) selected_tag_fg_color);
+            loft_rgba_set_from_str(&t->style.normal.bg, (char*) normal_tag_bg_color);
+            loft_rgba_set_from_str(&t->style.normal.fg, (char*) normal_tag_fg_color);
 
-            // catch button presses, attach to layout
+            loft_rgba_set_from_str(&t->style.selected.bg, (char*) selected_tag_bg_color);
+            loft_rgba_set_from_str(&t->style.selected.fg, (char*) selected_tag_fg_color);
 
-            loft_signal_connect(&t->base.base, "button-press", _on_tag_pressed, NULL);
-            loft_layout_attach(&m->bar->lt_tags, &t->base.base, EXPAND_X | EXPAND_Y);
+            loft_rgba_set_from_str(&t->style.urgent.bg, (char*) urgent_tag_bg_color);
+            loft_rgba_set_from_str(&t->style.urgent.fg, (char*) urgent_tag_fg_color);
+
+            // set minimum size
+
+            cr = cairo_create(t->base.cs);
+
+            cairo_select_font_face(cr, loftenv.font, CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
+            cairo_set_font_size(cr, loftenv.font_size);
+
+            cairo_text_extents(cr, tags[i], &ext);
+            cairo_font_extents(cr, &f_ext);
+
+            loft_widget_set_minimum_size(&t->base, ext.width + 10, f_ext.height + 8);
+
+            cairo_destroy(cr);
+
+            // catch events
+
+            loft_signal_connect(&t->base, "button-press", _on_tag_pressed, NULL);
+            loft_signal_connect(&t->base, "draw", _draw_tag, NULL);
+
+            // attach to layout
+
+            loft_layout_attach(&m->bar->lt_tags, &t->base, EXPAND_X | EXPAND_Y);
         }
 
         // set label colors
@@ -2271,11 +2376,33 @@ void updatebarstatus (Monitor* m) {
 
 void updatebartags (Monitor* m) {
     int i;
-    bool hl;
+    int mask;
+    TagLabel* t;
 
-    for (i = 0; i < LENGTH(tags); i++) {
-        hl = m->tagset[m->seltags] & 1 << m->lb_tags[i].num;
-        loft_label_toggle_highlight(&selmon->lb_tags[i].base, hl);
+    Client* c = NULL;
+    int cc;
+
+    for (i = 0, cc = 0; i < LENGTH(tags); i++, cc = 0) {
+        mask = 1 << i;
+        t = m->lb_tags + i;
+
+        t->selected = m->tagset[m->seltags] & mask;
+        t->urgent = false;
+
+        for (c = m->clients; c != NULL; c = c->next) {
+            if (c->tags & mask) {
+                cc++;
+
+                if (c->isurgent) {
+                    t->urgent = true;
+                    break;
+                }
+            }
+        }
+
+        t->empty = cc == 0;
+
+        loft_widget_draw(&t->base);
     }
 }
 
@@ -2559,6 +2686,8 @@ void updatewmhints (Client *c) {
         else
             c->isurgent = (wmh->flags & XUrgencyHint) ? true : false;
 
+        updatebartags(c->mon);
+
         if (wmh->flags & InputHint)
             c->neverfocus = !wmh->input;
         else
@@ -2591,9 +2720,10 @@ void view (const Arg *arg) {
         selmon->prevtag = oldcur;
     }
 
+    updatebartags(selmon);
+
     focus(NULL);
     arrange(selmon);
-    updatebartags(selmon);
 }
 
 Client* wintoclient (Window w) {
