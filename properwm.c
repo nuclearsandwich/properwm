@@ -2731,9 +2731,10 @@ void view (const Arg *arg) {
     }
 
     focus(selmon->focus[selmon->curtag]);
+    arrange(selmon);
+    
     updatebartags(selmon);
     updatebarlayout(selmon);
-    arrange(selmon);
 }
 
 Client* wintoclient (Window w) {
