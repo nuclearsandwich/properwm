@@ -1614,6 +1614,8 @@ void run (void) {
 
     while (running)
         iteration();
+
+    loftenv.running = false;
 }
 
 void scan (void) {
