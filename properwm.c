@@ -397,9 +397,9 @@ void _draw_tag (TagLabel* t) {
         cairo_new_path(cr);
         cairo_set_line_width(cr, 1.5);
 
-        cairo_move_to(cr, x_center / 2, t->base.height - 1);
+        cairo_move_to(cr, x_center / 2, t->base.height);
         cairo_line_to(cr, x_center, y_between);
-        cairo_line_to(cr, x_center + (x_center / 2), t->base.height - 1);
+        cairo_line_to(cr, x_center + (x_center / 2), t->base.height);
 
         cairo_close_path(cr);
         cairo_fill(cr);
