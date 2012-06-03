@@ -376,11 +376,8 @@ void _draw_tag (TagLabel* t) {
     cairo_text_extents_t ext;
     cairo_text_extents(cr, tags[t->num], &ext);
 
-    cairo_font_extents_t f_ext;
-    cairo_font_extents(cr, &f_ext);
-
     double x = (t->base.width / 2) - ((ext.width / 2) + ext.x_bearing);
-    double y = (t->base.height / 2) - ((f_ext.height / 2) + ext.y_bearing);
+    double y = (t->base.height / 2) - ((ext.height / 2) + ext.y_bearing);
 
     loft_cairo_set_rgba(cr, fg);
 
@@ -2716,29 +2713,31 @@ void view (const Arg *arg) {
     if ((arg->ui & TAGMASK) == selmon->tagset[selmon->seltags])
         return;
 
-    selmon->seltags ^= 1; /* toggle sel tagset */
+    selmon->seltags ^= 1;
 
     if (arg->ui & TAGMASK) {
         selmon->tagset[selmon->seltags] = arg->ui & TAGMASK;
+
+        selmon->prevtag = selmon->curtag;
         selmon->curtag = arg->ui;
 
-        if (arg->ui == ~0)
-            selmon->curtag = 0;
-        else {
+        if (arg->ui != -1) {
             int i;
             for (i = 0; (arg->ui & 1 << i) == 0; i++);
             selmon->curtag = i;
-        }
-    } else {
+        } else
+            selmon->curtag = 0;
+    }
+    else {
         int oldcur = selmon->curtag;
         selmon->curtag = selmon->prevtag;
         selmon->prevtag = oldcur;
     }
 
     focus(selmon->focus[selmon->curtag]);
-    arrange(selmon);
-
     updatebartags(selmon);
+
+    arrange(selmon);
     updatebarlayout(selmon);
 }
 
