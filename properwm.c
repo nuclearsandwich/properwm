@@ -2215,10 +2215,8 @@ void unmanage (Client *c, bool destroyed) {
 
     int i;
     for (i = 0; i < LENGTH(tags); i++) {
-        if (m->focus[i] == c) {
+        if (m->focus[i] == c)
             m->focus[i] = NULL;
-            printf("cleared tag focus: %s\n", tags[i]);
-        }
     }
 
     detach(c);
