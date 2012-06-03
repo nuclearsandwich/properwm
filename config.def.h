@@ -44,15 +44,16 @@ static const char status_fg_color[] = "#AAAAAA";
 // GENERAL SETTINGS
 //
 
-static unsigned int borderpx = 1;   /* window border width */
+static unsigned int border_width = 1;   /* window border width */
 static unsigned int padding = 10;   /* window padding */
 static unsigned int snap = 10;      /* snap threshold */
 
-static bool smartborders = true;    /* smart borders */
-static bool showbar = true;         /* bar visibility */
-static bool tagline = true;         /* draw line over tags selected client appears on */
-static bool topbar = true;          /* place bar at top (false = bottom) */
-static bool ffm = false;            /* focus follows mouse */
+static bool click_to_focus = true;          /* focus follows mouse */
+static bool client_indicator = true;        /* draw line over tag(s) selected client is on */
+static bool tag_indicator = true;           /* draw arrow under current tag */
+static bool smart_borders = true;           /* enable borders only when necessary */
+static bool show_bar = true;                /* show bar */
+static bool top_bar = true;                 /* place bar at top */
 
 //
 // TAGS

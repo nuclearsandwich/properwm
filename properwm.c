@@ -273,9 +273,10 @@ typedef struct TagLabel {
 
     int num;
 
-    bool unused;
+    bool current;
+    bool has_sel;
     bool selected;
-    bool underline;
+    bool unused;
     bool urgent;
 
     struct {
@@ -302,8 +303,8 @@ struct Monitor {
     unsigned int sellt;
     unsigned int tagset[2];
 
-    bool showbar;
-    bool topbar;
+    bool show_bar;
+    bool top_bar;
 
     Client *clients;
     Client *sel;
@@ -384,8 +385,23 @@ void _draw_tag (TagLabel* t) {
     cairo_move_to(cr, x, y);
     cairo_show_text(cr, tags[t->num]);
 
-    if (t->underline) {
+    if (client_indicator && t->has_sel) {
         cairo_rectangle(cr, 0, 0, t->base.width, 1);
+        cairo_fill(cr);
+    }
+
+    if (tag_indicator && t->current) {
+        int x_center = t->base.width / 2;
+        int y_between = t->base.height - (t->base.height / 6);
+
+        cairo_new_path(cr);
+        cairo_set_line_width(cr, 1.5);
+
+        cairo_move_to(cr, x_center / 2, t->base.height - 1);
+        cairo_line_to(cr, x_center, y_between);
+        cairo_line_to(cr, x_center + (x_center / 2), t->base.height - 1);
+
+        cairo_close_path(cr);
         cairo_fill(cr);
     }
 
@@ -524,7 +540,7 @@ void arrange (Monitor *m) {
 void arrangemon (Monitor *m) {
     strncpy(m->ltsymbol, m->lts[m->curtag]->symbol, sizeof(m->ltsymbol));
 
-    if (smartborders)
+    if (smart_borders)
         updateborders(m);
 
     if (m->lts[m->curtag]->arrange)
@@ -780,8 +796,8 @@ Monitor* createmon (void) {
 
     m->prevtag = m->curtag = 0;
     m->tagset[0] = m->tagset[1] = 1;
-    m->showbar = showbar;
-    m->topbar = topbar;
+    m->show_bar = show_bar;
+    m->top_bar = top_bar;
 
     m->sel = NULL;
 
@@ -791,7 +807,7 @@ Monitor* createmon (void) {
     int i;
 
     for (i = 0; i < 4; i++) {
-        if (m->showbar && ((i == STRUT_TOP && m->topbar) || (i == STRUT_BOTTOM && m->topbar == false)))
+        if (m->show_bar && ((i == STRUT_TOP && m->top_bar) || (i == STRUT_BOTTOM && m->top_bar == false)))
             m->struts[i] = bh;
         else
             m->struts[i] = 0;
@@ -866,7 +882,7 @@ void enternotify (XEvent *e) {
     Monitor *m;
     XCrossingEvent *ev = &e->xcrossing;
 
-    if (ffm == false)
+    if (click_to_focus)
         return;
 
     if (ev->window != root && (ev->mode != NotifyNormal || ev->detail == NotifyInferior))
@@ -1177,11 +1193,11 @@ void manage (Window w, XWindowAttributes *wa) {
     if (c->isfloating == false)
         c->isfloating = c->oldstate = trans != None || c->isfixed;
 
-    if (c->isfullscreen || (smartborders && c->mon->lts[c->mon->curtag]->arrange != NULL && c->isfloating == false
+    if (c->isfullscreen || (smart_borders && c->mon->lts[c->mon->curtag]->arrange != NULL && c->isfloating == false
     && (c->mon->lts[c->mon->curtag]->arrange == &monocle || ntiled(c->mon) == 0)))
         c->bw = 0;
     else
-        c->bw = borderpx;
+        c->bw = border_width;
 
     wc.border_width = c->bw;
     XConfigureWindow(dpy, w, CWBorderWidth, &wc);
@@ -1711,7 +1727,7 @@ void setfullscreen (Client *c, bool fullscreen) {
         c->oldstate = c->isfloating;
         c->isfloating = true;
         resizeclient(c, c->mon->mx, c->mon->my, c->mon->mw, c->mon->mh);
-        if (smartborders)
+        if (smart_borders)
             updateborders(c->mon);
         XRaiseWindow(dpy, c->win);
     }
@@ -1921,7 +1937,7 @@ void stack (Monitor *m) {
     else
         mh = m->wh;
 
-    bw = (smartborders && n == 1 ? 0 : borderpx);
+    bw = (smart_borders && n == 1 ? 0 : border_width);
 
     mx = 0;
     sx = 0;
@@ -2042,7 +2058,7 @@ void tile (Monitor *m) {
     else
         mw = m->ww;
 
-    bw = (smartborders && n == 1 ? 0 : borderpx);
+    bw = (smart_borders && n == 1 ? 0 : border_width);
 
     my = 0;
     ty = 0;
@@ -2107,12 +2123,12 @@ void tile (Monitor *m) {
 }
 
 void togglebar (const Arg *arg) {
-    selmon->showbar = selmon->showbar == false;
+    selmon->show_bar = selmon->show_bar == false;
 
-    selmon->struts[(selmon->topbar ? STRUT_TOP : STRUT_BOTTOM)] = (selmon->showbar ? bh : 0);
+    selmon->struts[(selmon->top_bar ? STRUT_TOP : STRUT_BOTTOM)] = (selmon->show_bar ? bh : 0);
     updatestruts(selmon);
 
-    if (selmon->showbar)
+    if (selmon->show_bar)
         loft_widget_show(&selmon->bar->win.base);
     else
         loft_widget_hide(&selmon->bar->win.base);
@@ -2121,16 +2137,16 @@ void togglebar (const Arg *arg) {
 }
 
 void togglebarpos (const Arg *arg) {
-    if (selmon->showbar == false)
+    if (selmon->show_bar == false)
         return;
 
-    selmon->struts[(selmon->topbar ? STRUT_TOP : STRUT_BOTTOM)] = 0;
-    selmon->topbar = selmon->topbar == false;
-    selmon->struts[(selmon->topbar ? STRUT_TOP : STRUT_BOTTOM)] += bh;
+    selmon->struts[(selmon->top_bar ? STRUT_TOP : STRUT_BOTTOM)] = 0;
+    selmon->top_bar = selmon->top_bar == false;
+    selmon->struts[(selmon->top_bar ? STRUT_TOP : STRUT_BOTTOM)] += bh;
 
     updatestruts(selmon);
 
-    if (selmon->topbar)
+    if (selmon->top_bar)
         selmon->by = selmon->my;
     else
         selmon->by = selmon->my + (selmon->mh - bh);
@@ -2152,7 +2168,7 @@ void togglefloating (const Arg *arg) {
         oldw = WIDTH(selmon->sel);
         oldh = HEIGHT(selmon->sel);
 
-        selmon->sel->bw = borderpx;
+        selmon->sel->bw = border_width;
 
         resize(selmon->sel, selmon->sel->x, selmon->sel->y, oldw, oldh, false);
 
@@ -2302,9 +2318,10 @@ void updatebars (void) {
 
             t->num = i;
 
+            t->current = false;
             t->unused = true;
             t->selected = false;
-            t->underline = false;
+            t->has_sel = false;
             t->urgent = false;
 
             // set tag colors
@@ -2369,7 +2386,7 @@ void updatebars (void) {
         updatebartitle(m);
         updatebarstatus(m);
 
-        if (showbar) {
+        if (show_bar) {
             setstrut(m, STRUT_TOP, bh);
             loft_widget_show(&m->bar->win.base);
         }
@@ -2396,8 +2413,9 @@ void updatebartags (Monitor* m) {
         mask = 1 << i;
         t = m->lb_tags + i;
 
+        t->current = m->curtag == i;
         t->selected = m->tagset[m->seltags] & mask;
-        t->underline = tagline && m->sel != NULL && m->sel->tags & mask;
+        t->has_sel = m->sel != NULL && m->sel->tags & mask;
 
         t->urgent = false;
 
@@ -2434,7 +2452,7 @@ void updateborders (Monitor *m) {
                 oldw = WIDTH(c);
                 oldh = HEIGHT(c);
 
-                c->bw = borderpx;
+                c->bw = border_width;
 
                 resize(c, c->x, c->y, oldw, oldh, false);
 
@@ -2453,7 +2471,7 @@ void updateborders (Monitor *m) {
     if (m->lts[m->curtag]->arrange == &monocle || ntiled(m) == 1)
         bdr = 0;
     else
-        bdr = borderpx;
+        bdr = border_width;
 
     for (c = nexttiled(m->clients); c; c = nexttiled(c->next)) {
         if (ISVISIBLE(c) == false)
