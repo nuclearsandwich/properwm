@@ -379,8 +379,8 @@ void _draw_tag (TagLabel* t) {
     cairo_font_extents_t f_ext;
     cairo_font_extents(cr, &f_ext);
 
-    int x = (t->base.width / 2) - ((ext.width / 2) + ext.x_bearing);
-    int y = (t->base.height / 2) - ((f_ext.height / 2) + ext.y_bearing);
+    double x = (t->base.width / 2) - ((ext.width / 2) + ext.x_bearing);
+    double y = (t->base.height / 2) - ((f_ext.height / 2) + ext.y_bearing);
 
     loft_cairo_set_rgba(cr, fg);
 
@@ -525,7 +525,7 @@ void arrange (Monitor *m) {
 }
 
 void arrangemon (Monitor *m) {
-    strncpy(m->ltsymbol, m->lts[m->curtag]->symbol, sizeof m->ltsymbol);
+    strncpy(m->ltsymbol, m->lts[m->curtag]->symbol, sizeof(m->ltsymbol));
 
     if (smartborders)
         updateborders(m);
@@ -1246,7 +1246,7 @@ monocle(Monitor *m) {
             n++;
 
     if (n > 0) { /* override layout symbol */
-        snprintf(m->ltsymbol, sizeof m->ltsymbol, "%d", n);
+        snprintf(m->ltsymbol, sizeof(m->ltsymbol), "%d", n);
         updatebarlayout(m);
     }
 
@@ -2624,8 +2624,8 @@ void updatesizehints (Client *c) {
         c->minw = c->minh = 0;
 
     if (size.flags & PAspect) {
-        c->mina = (float)size.min_aspect.y / size.min_aspect.x;
-        c->maxa = (float)size.max_aspect.x / size.max_aspect.y;
+        c->mina = (float) size.min_aspect.y / size.min_aspect.x;
+        c->maxa = (float) size.max_aspect.x / size.max_aspect.y;
     }
     else
         c->maxa = c->mina = 0.0;
