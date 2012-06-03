@@ -2213,7 +2213,14 @@ void unmanage (Client *c, bool destroyed) {
     Monitor* m = c->mon;
     XWindowChanges wc;
 
-    /* The server grab construct avoids race conditions. */
+    int i;
+    for (i = 0; i < LENGTH(tags); i++) {
+        if (m->focus[i] == c) {
+            m->focus[i] = NULL;
+            printf("cleared tag focus: %s\n", tags[i]);
+        }
+    }
+
     detach(c);
     detachstack(c);
 
@@ -2732,7 +2739,7 @@ void view (const Arg *arg) {
 
     focus(selmon->focus[selmon->curtag]);
     arrange(selmon);
-    
+
     updatebartags(selmon);
     updatebarlayout(selmon);
 }
