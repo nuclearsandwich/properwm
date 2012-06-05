@@ -14,6 +14,7 @@ static const int bar_height = 25;
 
 static const char normal_border_color[] = "#383838";
 static const char selected_border_color[] = "#ABCC00";
+static const char urgent_border_color[] = "#FF3F3F";
 
 // 8-digit colors optional
 

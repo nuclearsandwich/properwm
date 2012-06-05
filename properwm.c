@@ -220,6 +220,7 @@ void zoom (const Arg *arg);
 
 unsigned long border_normal;
 unsigned long border_selected;
+unsigned long border_urgent;
 
 const char broken[] = "broken";
 char stext[256];
@@ -1850,6 +1851,7 @@ void setup (void) {
 
     border_normal = getcolor(normal_border_color);
     border_selected = getcolor(selected_border_color);
+    border_urgent = getcolor(urgent_border_color);
 
     // EWMH support per view
 
@@ -2711,12 +2713,17 @@ void updatewmhints (Client *c) {
     XWMHints *wmh = XGetWMHints(dpy, c->win);
 
     if (wmh != NULL) {
-        if (c == selmon->sel && wmh->flags & XUrgencyHint) {
+        bool urgent = wmh->flags & XUrgencyHint;
+
+        if (c == selmon->sel && urgent) {
             wmh->flags &= ~XUrgencyHint;
             XSetWMHints(dpy, c->win, wmh);
         }
         else
-            c->isurgent = (wmh->flags & XUrgencyHint) ? true : false;
+            c->isurgent = urgent;
+
+        if (urgent)
+            XSetWindowBorder(dpy, c->win, border_urgent);
 
         if (wmh->flags & InputHint)
             c->neverfocus = !wmh->input;
