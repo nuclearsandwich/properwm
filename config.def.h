@@ -14,7 +14,7 @@ static const int bar_height = 25;
 
 static const char normal_border_color[] = "#383838";
 static const char selected_border_color[] = "#ABCC00";
-static const char urgent_border_color[] = "#FF3F3F";
+static const char urgent_border_color[] = "#FF0000";
 
 // 8-digit colors optional
 
@@ -32,13 +32,13 @@ static const char selected_tag_fg_color[] = "#AAAAAA";
 static const char urgent_tag_bg_color[] = "#000000CC";
 static const char urgent_tag_fg_color[] = "#FF3F3F";
 
-static const char ltsym_bg_color[] = "#232323CC";
+static const char ltsym_bg_color[] = "#303324CC";
 static const char ltsym_fg_color[] = "#AAAAAA";
 
 static const char title_bg_color[] = "#000000CC";
 static const char title_fg_color[] = "#AAAAAA";
 
-static const char status_bg_color[] = "#232323CC";
+static const char status_bg_color[] = "#303324CC";
 static const char status_fg_color[] = "#AAAAAA";
 
 //

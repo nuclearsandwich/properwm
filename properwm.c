@@ -2284,7 +2284,7 @@ void updatebars (void) {
         m->bar = malloc(sizeof(Bar));
 
         loft_window_init(&m->bar->win, 0);
-        loft_layout_init(&m->bar->lt_main, ASPECT_H, 10);
+        loft_layout_init(&m->bar->lt_main, ASPECT_H, 5);
         loft_layout_init(&m->bar->lt_tags, ASPECT_H, 0);
 
         loft_window_set_layout(&m->bar->win, &m->bar->lt_main);
@@ -2715,14 +2715,13 @@ void updatewmhints (Client *c) {
     if (wmh != NULL) {
         bool urgent = wmh->flags & XUrgencyHint;
 
-        if (c == selmon->sel && urgent) {
+        if (urgent && c == selmon->sel) {
             wmh->flags &= ~XUrgencyHint;
             XSetWMHints(dpy, c->win, wmh);
-        }
-        else
+        } else
             c->isurgent = urgent;
 
-        if (urgent)
+        if (urgent && c != selmon->sel)
             XSetWindowBorder(dpy, c->win, border_urgent);
 
         if (wmh->flags & InputHint)
