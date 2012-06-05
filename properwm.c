@@ -2373,18 +2373,20 @@ void updatebars (void) {
         loft_rgba_set_from_str(&m->bar->lb_status.style.normal.bg, (char*) status_bg_color);
         loft_rgba_set_from_str(&m->bar->lb_status.style.normal.fg, (char*) status_fg_color);
 
-        // override redirect, move, resize, and show
+        // override redirect, move, resize, lock size, show
+
+        loft_widget_override_redirect(&m->bar->win.base, true);
 
         loft_widget_move(&m->bar->win.base, m->mx, m->by);
         loft_widget_resize(&m->bar->win.base, m->mw, bh);
-        loft_widget_override_redirect(&m->bar->win.base, true);
-
-        loft_widget_show_all(&m->bar->lt_main.base);
+        loft_widget_lock_size(&m->bar->win.base, true);
 
         updatebartags(m);
         updatebarlayout(m);
         updatebartitle(m);
         updatebarstatus(m);
+
+        loft_widget_show_all(&m->bar->lt_main.base);
 
         if (show_bar) {
             setstrut(m, STRUT_TOP, bh);
