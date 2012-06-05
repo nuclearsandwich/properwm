@@ -2715,14 +2715,14 @@ void updatewmhints (Client *c) {
     if (wmh != NULL) {
         bool urgent = wmh->flags & XUrgencyHint;
 
-        if (urgent && c == selmon->sel) {
-            wmh->flags &= ~XUrgencyHint;
-            XSetWMHints(dpy, c->win, wmh);
+        if (urgent) {
+            if (c == selmon->sel) {
+                wmh->flags &= ~XUrgencyHint;
+                XSetWMHints(dpy, c->win, wmh);
+            } else
+                XSetWindowBorder(dpy, c->win, border_urgent);
         } else
             c->isurgent = urgent;
-
-        if (urgent && c != selmon->sel)
-            XSetWindowBorder(dpy, c->win, border_urgent);
 
         if (wmh->flags & InputHint)
             c->neverfocus = !wmh->input;
