@@ -45,16 +45,18 @@ static const char status_fg_color[] = "#AAAAAA";
 // GENERAL SETTINGS
 //
 
-static unsigned int border_width = 1;   /* window border width */
-static unsigned int padding = 10;   /* window padding */
-static unsigned int snap = 10;      /* snap threshold */
+static unsigned int border_width = 1;           // window border width
+static unsigned int client_indicator_width = 2; // line thickness for client indicator
+static unsigned int padding = 10;               // amount of padding between tiled windows
+static unsigned int snap = 10;                  // window snap threshold
 
-static bool click_to_focus = true;          /* focus follows mouse */
-static bool client_indicator = true;        /* draw line over tag(s) selected client is on */
-static bool tag_indicator = true;           /* draw arrow under current tag */
-static bool smart_borders = true;           /* enable borders only when necessary */
-static bool show_bar = true;                /* show bar */
-static bool top_bar = true;                 /* place bar at top */
+static bool click_to_focus = true;              // require click to focus windows with mouse, otherwise automatic
+static bool client_indicator = true;            // draw indicator over tag(s) selected client is on
+static bool ci_multi_tag_only = true;           // draw indicator only for clients on multiple tags
+static bool smart_borders = true;               // enable borders only when necessary
+static bool show_bar = true;                    // bar visibility
+static bool tag_arrow = true;                   // draw arrow under current tag
+static bool top_bar = true;                     // place bar at top
 
 //
 // TAGS

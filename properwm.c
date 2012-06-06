@@ -389,13 +389,14 @@ void _draw_tag (TagLabel* t) {
     // don't draw client indicator for single-tag clients
 
     unsigned long multi = selmon->sel != NULL && selmon->sel->tags != 1 << t->num;
+    bool indicate = (ci_multi_tag_only == false || (ci_multi_tag_only && multi));
 
-    if (client_indicator && t->has_sel && multi) {
-        cairo_rectangle(cr, 0, 0, t->base.width, 1);
+    if (client_indicator && t->has_sel && indicate) {
+        cairo_rectangle(cr, 0, 0, t->base.width, client_indicator_width);
         cairo_fill(cr);
     }
 
-    if (tag_indicator && t->current) {
+    if (tag_arrow && t->current) {
         int arrow_center_x = t->base.width / 2;
         int arrow_left_x = arrow_center_x / 2;
         int arrow_right_x = t->base.width - arrow_left_x;
