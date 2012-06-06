@@ -392,15 +392,17 @@ void _draw_tag (TagLabel* t) {
     }
 
     if (tag_indicator && t->current) {
-        int x_center = t->base.width / 2;
-        int y_between = t->base.height - (t->base.height / 6);
+        int arrow_center_x = t->base.width / 2;
+        int arrow_left_x = arrow_center_x / 2;
+        int arrow_right_x = t->base.width - arrow_left_x;
+        int arrow_top_y = t->base.height - (t->base.height / 6.5);
 
         cairo_new_path(cr);
         cairo_set_line_width(cr, 1.5);
 
-        cairo_move_to(cr, x_center / 2, t->base.height);
-        cairo_line_to(cr, x_center, y_between);
-        cairo_line_to(cr, x_center + (x_center / 2), t->base.height);
+        cairo_move_to(cr, arrow_left_x, t->base.height);
+        cairo_line_to(cr, arrow_center_x, arrow_top_y);
+        cairo_line_to(cr, arrow_right_x, t->base.height);
 
         cairo_close_path(cr);
         cairo_fill(cr);
