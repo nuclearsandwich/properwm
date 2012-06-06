@@ -2722,12 +2722,15 @@ void updatewmhints (Client *c) {
     if (wmh != NULL) {
         bool urgent = wmh->flags & XUrgencyHint;
 
-        if (urgent && c == selmon->sel) {
-            wmh->flags &= ~XUrgencyHint;
-            XSetWMHints(dpy, c->win, wmh);
-        } else {
-            c->isurgent = urgent;
-            XSetWindowBorder(dpy, c->win, border_urgent);
+        c->isurgent = urgent;
+
+
+        if (urgent)
+            if (c == selmon->sel) {
+                wmh->flags &= ~XUrgencyHint;
+                XSetWMHints(dpy, c->win, wmh);
+            }
+            else XSetWindowBorder(dpy, c->win, border_urgent);
         }
 
         if (wmh->flags & InputHint)
