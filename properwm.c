@@ -386,7 +386,11 @@ void _draw_tag (TagLabel* t) {
     cairo_move_to(cr, x, y);
     cairo_show_text(cr, tags[t->num]);
 
-    if (client_indicator && t->has_sel) {
+    // don't draw client indicator for single-tag clients
+
+    unsigned long multi = selmon->sel != NULL && selmon->sel->tags != 1 << t->num;
+
+    if (client_indicator && t->has_sel && multi) {
         cairo_rectangle(cr, 0, 0, t->base.width, 1);
         cairo_fill(cr);
     }
@@ -395,7 +399,7 @@ void _draw_tag (TagLabel* t) {
         int arrow_center_x = t->base.width / 2;
         int arrow_left_x = arrow_center_x / 2;
         int arrow_right_x = t->base.width - arrow_left_x;
-        int arrow_top_y = t->base.height - (t->base.height / 6.5);
+        int arrow_top_y = t->base.height - (t->base.height / 7);
 
         cairo_new_path(cr);
         cairo_set_line_width(cr, 1.5);
@@ -2409,20 +2413,20 @@ void updatebarstatus (Monitor* m) {
 
 void updatebartags (Monitor* m) {
     int i;
+    int cc;
     int mask;
     TagLabel* t;
 
     Client* c = NULL;
-    int cc;
 
-    for (i = 0, cc = 0; i < LENGTH(tags); i++, cc = 0) {
+    for (i = 0; i < LENGTH(tags); i++) {
+        cc = 0;
         mask = 1 << i;
+
         t = m->lb_tags + i;
-
-        t->current = m->curtag == i;
-        t->selected = m->tagset[m->seltags] & mask;
-        t->has_sel = m->sel != NULL && m->sel->tags & mask;
-
+        t->current = i == m->curtag;
+        t->has_sel = m->sel != NULL && mask & m->sel->tags;
+        t->selected = mask & m->tagset[m->seltags];
         t->urgent = false;
 
         for (c = m->clients; c != NULL; c = c->next) {
@@ -2717,14 +2721,13 @@ void updatewmhints (Client *c) {
     if (wmh != NULL) {
         bool urgent = wmh->flags & XUrgencyHint;
 
-        if (urgent) {
-            if (c == selmon->sel) {
-                wmh->flags &= ~XUrgencyHint;
-                XSetWMHints(dpy, c->win, wmh);
-            } else
-                XSetWindowBorder(dpy, c->win, border_urgent);
-        } else
+        if (urgent && c == selmon->sel) {
+            wmh->flags &= ~XUrgencyHint;
+            XSetWMHints(dpy, c->win, wmh);
+        } else {
             c->isurgent = urgent;
+            XSetWindowBorder(dpy, c->win, border_urgent);
+        }
 
         if (wmh->flags & InputHint)
             c->neverfocus = !wmh->input;
@@ -2732,7 +2735,6 @@ void updatewmhints (Client *c) {
             c->neverfocus = false;
 
         updatebartags(c->mon);
-
         XFree(wmh);
     }
 }
