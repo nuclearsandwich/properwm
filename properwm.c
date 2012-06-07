@@ -386,27 +386,15 @@ void _draw_tag (TagLabel* t) {
     cairo_move_to(cr, x, y);
     cairo_show_text(cr, tags[t->num]);
 
-    // don't draw client indicator for single-tag clients
-
-    unsigned long multi = selmon->sel != NULL && selmon->sel->tags != 1 << t->num;
-    bool indicate = (ci_multi_tag_only == false || (ci_multi_tag_only && multi));
-
-    if (client_indicator && indicate && t->has_sel) {
-        cairo_rectangle(cr, 1, 0, t->base.width - 2, client_indicator_width);
+    if (client_indicator && t->has_sel) {
+        cairo_move_to(cr, 0, t->base.height / 4);
+        cairo_line_to(cr, 0, 0);
+        cairo_line_to(cr, t->base.width / 4, 0);
         cairo_fill(cr);
     }
 
-    if (tag_arrow && t->current) {
-        double x_left = t->base.width / 4;
-        double x_center = t->base.width / 2;
-        double x_right = t->base.width - x_left;
-
-        double y_top = t->base.height - (t->base.height / 6);
-        double y_bottom = t->base.height - 1;
-
-        cairo_move_to(cr, x_left, y_bottom);
-        cairo_line_to(cr, x_center, y_top);
-        cairo_line_to(cr, x_right, y_bottom);
+    if (tag_indicator && t->current) {
+        cairo_rectangle(cr, x, t->base.height - (t->base.height / 4), ext.width, 1);
         cairo_fill(cr);
     }
 
