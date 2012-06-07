@@ -18,27 +18,27 @@ static const char urgent_border_color[] = "#FF0000";
 
 // 8-digit colors optional
 
-static const char base_color[] = "#000000CC";
+static const char base_color[] = "#000000DD";
 
-static const char unused_tag_bg_color[] = "#000000CC";
+static const char unused_tag_bg_color[] = "#000000DD";
 static const char unused_tag_fg_color[] = "#666666";
 
-static const char normal_tag_bg_color[] = "#000000CC";
+static const char normal_tag_bg_color[] = "#000000DD";
 static const char normal_tag_fg_color[] = "#485666";
 
-static const char selected_tag_bg_color[] = "#000000CC";
+static const char selected_tag_bg_color[] = "#000000DD";
 static const char selected_tag_fg_color[] = "#AAAAAA";
 
-static const char urgent_tag_bg_color[] = "#000000CC";
+static const char urgent_tag_bg_color[] = "#000000DD";
 static const char urgent_tag_fg_color[] = "#FF3F3F";
 
-static const char ltsym_bg_color[] = "#2D3640CC";
+static const char ltsym_bg_color[] = "#2D3640DD";
 static const char ltsym_fg_color[] = "#AAAAAA";
 
-static const char title_bg_color[] = "#000000CC";
+static const char title_bg_color[] = "#000000DD";
 static const char title_fg_color[] = "#AAAAAA";
 
-static const char status_bg_color[] = "#2D3640CC";
+static const char status_bg_color[] = "#2D3640DD";
 static const char status_fg_color[] = "#AAAAAA";
 
 //
@@ -46,7 +46,7 @@ static const char status_fg_color[] = "#AAAAAA";
 //
 
 static unsigned int border_width = 1;           // window border width
-static unsigned int client_indicator_width = 2; // line thickness for client indicator
+static unsigned int client_indicator_width = 1; // line thickness for client indicator
 static unsigned int padding = 10;               // amount of padding between tiled windows
 static unsigned int snap = 10;                  // window snap threshold
 

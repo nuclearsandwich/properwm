@@ -391,25 +391,22 @@ void _draw_tag (TagLabel* t) {
     unsigned long multi = selmon->sel != NULL && selmon->sel->tags != 1 << t->num;
     bool indicate = (ci_multi_tag_only == false || (ci_multi_tag_only && multi));
 
-    if (client_indicator && t->has_sel && indicate) {
-        cairo_rectangle(cr, 0, 0, t->base.width, client_indicator_width);
+    if (client_indicator && indicate && t->has_sel) {
+        cairo_rectangle(cr, 1, 0, t->base.width - 2, client_indicator_width);
         cairo_fill(cr);
     }
 
     if (tag_arrow && t->current) {
-        int arrow_center_x = t->base.width / 2;
-        int arrow_left_x = arrow_center_x / 2;
-        int arrow_right_x = t->base.width - arrow_left_x;
-        int arrow_top_y = t->base.height - (t->base.height / 7);
+        double x_left = t->base.width / 4;
+        double x_center = t->base.width / 2;
+        double x_right = t->base.width - x_left;
 
-        cairo_new_path(cr);
-        cairo_set_line_width(cr, 1.5);
+        double y_top = t->base.height - (t->base.height / 6);
+        double y_bottom = t->base.height - 1;
 
-        cairo_move_to(cr, arrow_left_x, t->base.height);
-        cairo_line_to(cr, arrow_center_x, arrow_top_y);
-        cairo_line_to(cr, arrow_right_x, t->base.height);
-
-        cairo_close_path(cr);
+        cairo_move_to(cr, x_left, y_bottom);
+        cairo_line_to(cr, x_center, y_top);
+        cairo_line_to(cr, x_right, y_bottom);
         cairo_fill(cr);
     }
 
