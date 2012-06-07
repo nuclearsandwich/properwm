@@ -24,7 +24,7 @@ static const char unused_tag_bg_color[] = "#000000CC";
 static const char unused_tag_fg_color[] = "#666666";
 
 static const char normal_tag_bg_color[] = "#000000CC";
-static const char normal_tag_fg_color[] = "#5E82AB";
+static const char normal_tag_fg_color[] = "#485666";
 
 static const char selected_tag_bg_color[] = "#000000CC";
 static const char selected_tag_fg_color[] = "#AAAAAA";
@@ -32,13 +32,13 @@ static const char selected_tag_fg_color[] = "#AAAAAA";
 static const char urgent_tag_bg_color[] = "#000000CC";
 static const char urgent_tag_fg_color[] = "#FF3F3F";
 
-static const char ltsym_bg_color[] = "#303324CC";
+static const char ltsym_bg_color[] = "#2D3640CC";
 static const char ltsym_fg_color[] = "#AAAAAA";
 
 static const char title_bg_color[] = "#000000CC";
 static const char title_fg_color[] = "#AAAAAA";
 
-static const char status_bg_color[] = "#303324CC";
+static const char status_bg_color[] = "#2D3640CC";
 static const char status_fg_color[] = "#AAAAAA";
 
 //

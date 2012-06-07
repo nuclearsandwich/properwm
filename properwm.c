@@ -2725,7 +2725,7 @@ void updatewmhints (Client *c) {
         c->isurgent = urgent;
 
 
-        if (urgent)
+        if (urgent) {
             if (c == selmon->sel) {
                 wmh->flags &= ~XUrgencyHint;
                 XSetWMHints(dpy, c->win, wmh);
