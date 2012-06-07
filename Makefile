@@ -18,11 +18,7 @@ options:
 	@echo CC $<
 	@${CC} -c ${CFLAGS} $<
 
-${OBJ}: config.h config.mk
-
-config.h:
-	@echo creating $@ from config.def.h
-	@cp config.def.h $@
+${OBJ}: config.mk
 
 properwm: ${OBJ}
 	@echo CC -o $@
@@ -35,7 +31,7 @@ clean:
 dist: clean
 	@echo creating dist tarball
 	@mkdir -p properwm-${VERSION}
-	@cp -R LICENSE Makefile README config.def.h config.mk \
+	@cp -R LICENSE Makefile README config.h config.mk \
 		properwm.1 ${SRC} properwm-${VERSION}
 	@tar -cf properwm-${VERSION}.tar properwm-${VERSION}
 	@gzip properwm-${VERSION}.tar

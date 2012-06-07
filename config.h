@@ -18,27 +18,27 @@ static const char urgent_border_color[] = "#FF0000";
 
 // 8-digit colors optional
 
-static const char base_color[] = "#000000DD";
+static const char base_color[] = "#000000CC";
 
-static const char unused_tag_bg_color[] = "#000000DD";
-static const char unused_tag_fg_color[] = "#666666";
+static const char unused_tag_bg_color[] = "#000000CC";
+static const char unused_tag_fg_color[] = "#555555";
 
-static const char normal_tag_bg_color[] = "#000000DD";
-static const char normal_tag_fg_color[] = "#405D80";
+static const char normal_tag_bg_color[] = "#000000CC";
+static const char normal_tag_fg_color[] = "#5E758F";
 
-static const char selected_tag_bg_color[] = "#000000DD";
+static const char selected_tag_bg_color[] = "#000000CC";
 static const char selected_tag_fg_color[] = "#AAAAAA";
 
-static const char urgent_tag_bg_color[] = "#000000DD";
+static const char urgent_tag_bg_color[] = "#000000CC";
 static const char urgent_tag_fg_color[] = "#FF3F3F";
 
-static const char ltsym_bg_color[] = "#405D80";
+static const char ltsym_bg_color[] = "#394757CC";
 static const char ltsym_fg_color[] = "#CCCCCC";
 
-static const char title_bg_color[] = "#000000DD";
+static const char title_bg_color[] = "#000000CC";
 static const char title_fg_color[] = "#AAAAAA";
 
-static const char status_bg_color[] = "#405D80";
+static const char status_bg_color[] = "#394757CC";
 static const char status_fg_color[] = "#CCCCCC";
 
 //
@@ -50,11 +50,17 @@ static unsigned int padding = 10;               // amount of padding between til
 static unsigned int snap = 10;                  // window snap threshold
 
 static bool click_to_focus = true;              // require click to focus windows with mouse, otherwise automatic
-static bool client_indicator = true;            // draw indicator showing which tag(s) selected client is on
 static bool smart_borders = true;               // enable borders only when necessary
 static bool show_bar = true;                    // bar visibility
-static bool tag_indicator = true;               // draw indicator for current tag
 static bool top_bar = true;                     // place bar at top
+
+//
+// INDICATORS
+//
+
+static bool client_indicator = true;            // draw indicator showing which tag(s) selected client is on
+static bool tag_indicator = true;               // draw indicator arrow for current tag
+static double tag_indicator_width = 1.5;        // tag indicator line width
 
 //
 // TAGS

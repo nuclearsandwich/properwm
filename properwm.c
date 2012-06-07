@@ -394,7 +394,7 @@ void _draw_tag (TagLabel* t) {
     }
 
     if (tag_indicator && t->current) {
-        cairo_rectangle(cr, x, t->base.height - (t->base.height / 4), ext.width, 1);
+        cairo_rectangle(cr, x, t->base.height - (t->base.height / 5), ext.width, tag_indicator_width);
         cairo_fill(cr);
     }
 
