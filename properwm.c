@@ -1251,10 +1251,10 @@ monocle(Monitor *m) {
         if (ISVISIBLE(c))
             n++;
 
-    if (n > 0) { /* override layout symbol */
+    if (n > 0) // override layout symbol
         snprintf(m->ltsymbol, sizeof(m->ltsymbol), "%d", n);
-        updatebarlayout(m);
-    }
+
+    updatebarlayout(m);
 
     for (c = nexttiled(m->clients); c; c = nexttiled(c->next))
         resize(c, m->wx + padding, m->wy + padding, m->ww - (2*c->bw) - (2*padding), m->wh - (2*c->bw) - (2*padding), false);
