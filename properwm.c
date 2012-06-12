@@ -388,8 +388,8 @@ void _draw_tag (TagLabel* t) {
     pango_layout_set_text(layout, tags[t->num], -1);
     pango_layout_get_extents(layout, &ink, &logical);
 
-    int realw = ink.width / PANGO_SCALE;
-    int realh = ink.height / PANGO_SCALE;
+    int realw = logical.width / PANGO_SCALE;
+    int realh = logical.height / PANGO_SCALE;
 
     double x = (t->base.width / 2) - (realw / 2);
     double y = (t->base.height / 2) - (realh / 2);
