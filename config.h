@@ -3,7 +3,7 @@
 //
 
 static const char font_name[] = "Terminus";
-static const int font_size = 16;
+static const int font_size = 12;
 static const int bar_height = 25;
 
 //

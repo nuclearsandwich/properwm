@@ -4,6 +4,9 @@
 #include <loft.h>
 
 #include <pthread.h>
+
+#include <pango/pangocairo.h>
+
 #include <signal.h>
 
 #include <stdarg.h>
@@ -35,12 +38,12 @@
 /* macros */
 #define BUTTONMASK              (ButtonPressMask|ButtonReleaseMask)
 #define CLEANMASK(mask)         (mask & ~(numlockmask|LockMask) & (ShiftMask|ControlMask|Mod1Mask|Mod2Mask|Mod3Mask|Mod4Mask|Mod5Mask))
-#define INTERSECT(x,y,w,h,m)    (MAX(0, MIN((x)+(w),(m)->wx+(m)->ww) - MAX((x),(m)->wx)) \
-                               * MAX(0, MIN((y)+(h),(m)->wy+(m)->wh) - MAX((y),(m)->wy)))
+#define INTERSECT(x,y,w,h,m)    (_MAX(0, _MIN((x)+(w),(m)->wx+(m)->ww) - _MAX((x),(m)->wx)) \
+                               * _MAX(0, _MIN((y)+(h),(m)->wy+(m)->wh) - _MAX((y),(m)->wy)))
 #define ISVISIBLE(C)            ((C->tags & C->mon->tagset[C->mon->seltags]))
 #define LENGTH(X)               (sizeof X / sizeof X[0])
-#define MAX(A, B)               ((A) > (B) ? (A) : (B))
-#define MIN(A, B)               ((A) < (B) ? (A) : (B))
+#define _MAX(A, B)               ((A) > (B) ? (A) : (B))
+#define _MIN(A, B)               ((A) < (B) ? (A) : (B))
 #define MOUSEMASK               (BUTTONMASK|PointerMotionMask)
 #define WIDTH(X)                ((X)->w + 2 * (X)->bw)
 #define HEIGHT(X)               ((X)->h + 2 * (X)->bw)
@@ -372,19 +375,34 @@ void _draw_tag (TagLabel* t) {
     cairo_rectangle(cr, 0, 0, t->base.width, t->base.height);
     cairo_fill(cr);
 
-    cairo_select_font_face(cr, loftenv.font, CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
-    cairo_set_font_size(cr, loftenv.font_size);
+    char* fstr = malloc(strlen(loftenv.font) + 5);
+    sprintf(fstr, "%s %d", loftenv.font, loftenv.font_size);
 
-    cairo_text_extents_t ext;
-    cairo_text_extents(cr, tags[t->num], &ext);
+    PangoLayout* layout = pango_cairo_create_layout(cr);
+    PangoFontDescription* font_desc = pango_font_description_from_string(fstr);
+    pango_layout_set_font_description(layout, font_desc);
 
-    double x = (t->base.width / 2) - ((ext.width / 2) + ext.x_bearing);
-    double y = (t->base.height / 2) - ((ext.height / 2) + ext.y_bearing);
+    PangoRectangle ink;
+    PangoRectangle logical;
+
+    pango_layout_set_text(layout, tags[t->num], -1);
+    pango_layout_get_extents(layout, &ink, &logical);
+
+    int realw = ink.width / PANGO_SCALE;
+    int realh = ink.height / PANGO_SCALE;
+
+    double x = (t->base.width / 2) - (realw / 2);
+    double y = (t->base.height / 2) - (realh / 2);
 
     loft_cairo_set_rgba(cr, fg);
 
     cairo_move_to(cr, x, y);
-    cairo_show_text(cr, tags[t->num]);
+    pango_cairo_show_layout(cr, layout);
+
+    free(fstr);
+
+    pango_font_description_free(font_desc);
+    g_object_unref(layout);
 
     if (client_indicator && t->has_sel) {
         cairo_move_to(cr, 0, t->base.height / 4);
@@ -394,7 +412,7 @@ void _draw_tag (TagLabel* t) {
     }
 
     if (tag_indicator && t->current) {
-        cairo_rectangle(cr, x, t->base.height - (t->base.height / 5), ext.width, tag_indicator_width);
+        cairo_rectangle(cr, x, t->base.height - (t->base.height / 5), realw, tag_indicator_width);
         cairo_fill(cr);
     }
 
@@ -443,8 +461,8 @@ bool applysizehints (Client *c, int *x, int *y, int *w, int *h, bool interact) {
     Monitor *m = c->mon;
 
     /* set minimum possible */
-    *w = MAX(1, *w);
-    *h = MAX(1, *h);
+    *w = _MAX(1, *w);
+    *h = _MAX(1, *h);
 
     if (interact) {
         if (*x > sw)
@@ -505,13 +523,13 @@ bool applysizehints (Client *c, int *x, int *y, int *w, int *h, bool interact) {
 
         /* restore base dimensions */
 
-        *w = MAX(*w + c->basew, c->minw);
-        *h = MAX(*h + c->baseh, c->minh);
+        *w = _MAX(*w + c->basew, c->minw);
+        *h = _MAX(*h + c->baseh, c->minh);
 
         if (c->maxw)
-            *w = MIN(*w, c->maxw);
+            *w = _MIN(*w, c->maxw);
         if (c->maxh)
-            *h = MIN(*h, c->maxh);
+            *h = _MIN(*h, c->maxh);
     }
 
     return *x != c->x || *y != c->y || *w != c->w || *h != c->h;
@@ -1083,7 +1101,7 @@ void grabkeys (void) {
 }
 
 void incnmaster (const Arg *arg) {
-    selmon->nmasters[selmon->curtag] = MAX(selmon->nmasters[selmon->curtag] + arg->i, 0);
+    selmon->nmasters[selmon->curtag] = _MAX(selmon->nmasters[selmon->curtag] + arg->i, 0);
     arrange(selmon);
 }
 
@@ -1174,9 +1192,9 @@ void manage (Window w, XWindowAttributes *wa) {
     if (c->y + HEIGHT(c) > c->mon->my + c->mon->mh)
         c->y = c->mon->my + c->mon->mh - HEIGHT(c);
 
-    c->x = MAX(c->x, c->mon->mx);
+    c->x = _MAX(c->x, c->mon->mx);
     /* only fix client y-offset, ifthe client center might cover the bar */
-    c->y = MAX(c->y, ((c->mon->by == c->mon->my) && (c->x + (c->w / 2) >= c->mon->wx)
+    c->y = _MAX(c->y, ((c->mon->by == c->mon->my) && (c->x + (c->w / 2) >= c->mon->wx)
                && (c->x + (c->w / 2) < c->mon->wx + c->mon->ww)) ? bh : c->mon->my);
 
     updatewindowtype(c);
@@ -1560,8 +1578,8 @@ void resizemouse (const Arg *arg) {
             handler[ev.type](&ev);
             break;
         case MotionNotify:
-            nw = MAX(ev.xmotion.x - ocx - 2 * c->bw + 1, 1);
-            nh = MAX(ev.xmotion.y - ocy - 2 * c->bw + 1, 1);
+            nw = _MAX(ev.xmotion.x - ocx - 2 * c->bw + 1, 1);
+            nh = _MAX(ev.xmotion.y - ocy - 2 * c->bw + 1, 1);
 
             if (c->mon->wx + nw >= selmon->wx && c->mon->wx + nw <= selmon->wx + selmon->ww
             && c->mon->wy + nh >= selmon->wy && c->mon->wy + nh <= selmon->wy + selmon->wh)
@@ -2832,9 +2850,7 @@ int main (int argc, char *argv[]) {
     loft_init();
 
     loftenv.font = (char*) font_name;
-    loftenv.font_size = font_size;
-
-    // init base color (used for bar)
+    loftenv.font_size = (int) font_size;
 
     loft_rgba_set_from_str(&loftenv.colors.base, (char*) base_color);
 

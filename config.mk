@@ -16,12 +16,12 @@ XINERAMAFLAGS = -DXINERAMA
 
 # includes and libs
 INCS = -I${X11INC}
-LIBS = -L${X11LIB} -lX11 -lpthread ${XINERAMALIBS} `pkg-config --libs loft`
+LIBS = -L${X11LIB} -lX11 -lpthread ${XINERAMALIBS} `pkg-config --libs loft pangocairo`
 
 # flags
 CPPFLAGS = -D_BSD_SOURCE -D_POSIX_C_SOURCE=2 -DVERSION=\"${VERSION}\" ${XINERAMAFLAGS}
 #CFLAGS   = -g -std=c99 -pedantic -Wall -O0 ${INCS} ${CPPFLAGS}
-CFLAGS   = -g -std=c99 -Wall -Os ${INCS} ${CPPFLAGS} `pkg-config --cflags loft`
+CFLAGS   = -g -std=c99 -Wall -Os ${INCS} ${CPPFLAGS} `pkg-config --cflags loft pangocairo`
 LDFLAGS  = -s ${LIBS}
 
 # Solaris
