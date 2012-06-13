@@ -275,6 +275,14 @@ typedef struct Bar {
 typedef struct TagLabel {
     LoftWidget base;
 
+    struct {
+        LoftRGBAPair unused;
+        LoftRGBAPair normal;
+        LoftRGBAPair current;
+        LoftRGBAPair selected;
+        LoftRGBAPair urgent;
+    } style;
+
     int num;
 
     bool current;
@@ -282,13 +290,6 @@ typedef struct TagLabel {
     bool selected;
     bool unused;
     bool urgent;
-
-    struct {
-        LoftRGBAPair unused;
-        LoftRGBAPair normal;
-        LoftRGBAPair selected;
-        LoftRGBAPair urgent;
-    } style;
 } TagLabel;
 
 struct Monitor {
@@ -351,7 +352,11 @@ void _draw_tag (TagLabel* t) {
     LoftRGBA* bg;
     LoftRGBA* fg;
 
-    if (t->selected) {
+    if (t->current) {
+        bg = &t->style.current.bg;
+        fg = &t->style.current.fg;
+    }
+    else if (t->selected) {
         bg = &t->style.selected.bg;
         fg = &t->style.selected.fg;
     }
@@ -404,15 +409,20 @@ void _draw_tag (TagLabel* t) {
     pango_font_description_free(font_desc);
     g_object_unref(layout);
 
-    if (client_indicator && t->has_sel) {
-        cairo_move_to(cr, 0, t->base.height / 4);
-        cairo_line_to(cr, 0, 0);
-        cairo_line_to(cr, t->base.width / 4, 0);
-        cairo_fill(cr);
-    }
+    bool multi = selmon->sel != NULL && selmon->sel->tags != 1 << t->num;
 
-    if (tag_indicator && t->current) {
-        cairo_rectangle(cr, x, t->base.height - (t->base.height / 5), realw, tag_indicator_width);
+    if (client_indicator && t->has_sel && multi) {
+        double ind_x_left = t->base.width / 6;
+        double ind_x_center = t->base.width / 2;
+        double ind_x_right = t->base.width - ind_x_left;
+
+        double ind_y_base = selmon->top_bar ? 0 : t->base.height;
+        double ind_y_top = selmon->top_bar ? t->base.height / 7 : t->base.height - (t->base.height / 7);
+
+        cairo_move_to(cr, ind_x_left, ind_y_base);
+        cairo_line_to(cr, ind_x_right, ind_y_base);
+        cairo_line_to(cr, ind_x_center, ind_y_top);
+
         cairo_fill(cr);
     }
 
@@ -2165,6 +2175,8 @@ void togglebarpos (const Arg *arg) {
 
     loft_widget_move(&selmon->bar->win.base, selmon->mx, selmon->by);
     arrange(selmon);
+
+    updatebartags(selmon);
 }
 
 void togglefloating (const Arg *arg) {
@@ -2343,6 +2355,9 @@ void updatebars (void) {
 
             loft_rgba_set_from_str(&t->style.normal.bg, (char*) normal_tag_bg_color);
             loft_rgba_set_from_str(&t->style.normal.fg, (char*) normal_tag_fg_color);
+
+            loft_rgba_set_from_str(&t->style.current.bg, (char*) current_tag_bg_color);
+            loft_rgba_set_from_str(&t->style.current.fg, (char*) current_tag_fg_color);
 
             loft_rgba_set_from_str(&t->style.selected.bg, (char*) selected_tag_bg_color);
             loft_rgba_set_from_str(&t->style.selected.fg, (char*) selected_tag_fg_color);
