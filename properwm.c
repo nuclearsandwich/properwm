@@ -309,7 +309,7 @@ struct Monitor {
     unsigned int tagset[2];
 
     bool show_bar;
-    bool top_bar;
+    bool bar_pos;
 
     Client *clients;
     Client *sel;
@@ -416,12 +416,12 @@ void _draw_tag (TagLabel* t) {
         double ind_x_center = t->base.width / 2;
         double ind_x_right = t->base.width - ind_x_left;
 
-        double ind_y_base = selmon->top_bar ? 0 : t->base.height;
-        double ind_y_top = selmon->top_bar ? t->base.height / 7 : t->base.height - (t->base.height / 7);
+        double ind_y_base = selmon->bar_pos == TOP ? 0 : t->base.height;
+        double ind_y_point = selmon->bar_pos == TOP ? t->base.height / 7 : t->base.height - (t->base.height / 7);
 
         cairo_move_to(cr, ind_x_left, ind_y_base);
         cairo_line_to(cr, ind_x_right, ind_y_base);
-        cairo_line_to(cr, ind_x_center, ind_y_top);
+        cairo_line_to(cr, ind_x_center, ind_y_point);
 
         cairo_fill(cr);
     }
@@ -818,7 +818,7 @@ Monitor* createmon (void) {
     m->prevtag = m->curtag = 0;
     m->tagset[0] = m->tagset[1] = 1;
     m->show_bar = show_bar;
-    m->top_bar = top_bar;
+    m->bar_pos = bar_pos;
 
     m->sel = NULL;
 
@@ -828,7 +828,7 @@ Monitor* createmon (void) {
     int i;
 
     for (i = 0; i < 4; i++) {
-        if (m->show_bar && ((i == STRUT_TOP && m->top_bar) || (i == STRUT_BOTTOM && m->top_bar == false)))
+        if (m->show_bar && ((i == STRUT_TOP && m->bar_pos == TOP) || (i == STRUT_BOTTOM && m->bar_pos == BOTTOM)))
             m->struts[i] = bh;
         else
             m->struts[i] = 0;
@@ -2147,8 +2147,8 @@ void tile (Monitor *m) {
 void togglebar (const Arg *arg) {
     selmon->show_bar = selmon->show_bar == false;
 
-    selmon->struts[(selmon->top_bar ? STRUT_TOP : STRUT_BOTTOM)] = (selmon->show_bar ? bh : 0);
-    updatestruts(selmon);
+    int pos = selmon->bar_pos == TOP ? STRUT_TOP : STRUT_BOTTOM;
+    setstrut(selmon, pos, selmon->show_bar ? bh : 0);
 
     if (selmon->show_bar)
         loft_widget_show(&selmon->bar->win.base);
@@ -2162,13 +2162,16 @@ void togglebarpos (const Arg *arg) {
     if (selmon->show_bar == false)
         return;
 
-    selmon->struts[(selmon->top_bar ? STRUT_TOP : STRUT_BOTTOM)] = 0;
-    selmon->top_bar = selmon->top_bar == false;
-    selmon->struts[(selmon->top_bar ? STRUT_TOP : STRUT_BOTTOM)] += bh;
+    int old_st_pos = selmon->bar_pos == TOP ? STRUT_TOP : STRUT_BOTTOM;
+    selmon->bar_pos = selmon->bar_pos == false;
+    int new_st_pos = selmon->bar_pos == TOP ? STRUT_TOP : STRUT_BOTTOM;
+
+    selmon->struts[old_st_pos] = 0;
+    selmon->struts[new_st_pos] += bh;
 
     updatestruts(selmon);
 
-    if (selmon->top_bar)
+    if (selmon->bar_pos == TOP)
         selmon->by = selmon->my;
     else
         selmon->by = selmon->my + (selmon->mh - bh);

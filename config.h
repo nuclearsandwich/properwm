@@ -48,15 +48,20 @@ static const char status_fg_color[] = "#CCCCCC";
 // GENERAL SETTINGS
 //
 
-static unsigned int border_width = 1;           // window border width
-static unsigned int padding = 10;               // amount of padding between tiled windows
-static unsigned int snap = 10;                  // window snap threshold
+enum {
+    TOP,
+    BOTTOM
+};
 
-static bool click_to_focus = true;              // require click to focus windows with mouse, otherwise automatic
-static bool client_indicator = true;            // draw indicator showing which tag(s) selected client is on
-static bool smart_borders = true;               // enable borders only when necessary
-static bool show_bar = true;                    // bar visibility
-static bool top_bar = true;                     // place bar at top
+static unsigned int border_width = 1; // window border width
+static unsigned int padding = 10;     // amount of padding between tiled windows
+static unsigned int snap = 10;        // window snap threshold
+
+static bool click_to_focus = true;    // require click to focus windows with mouse, otherwise automatic
+static bool client_indicator = true;  // draw indicator showing which tag(s) selected client is on
+static bool smart_borders = true;     // enable borders only when necessary
+static bool show_bar = true;          // bar visibility
+static int  bar_pos = TOP;            // bar position, TOP or BOTTOM
 
 //
 // TAGS
