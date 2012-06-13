@@ -18,30 +18,28 @@ static const char urgent_border_color[] = "#FF0000";
 
 // 8-digit colors optional
 
-static const char base_color[] = "#000000CC";
-
-static const char unused_tag_bg_color[] = "#000000CC";
+static const char unused_tag_bg_color[] = "#00000099";
 static const char unused_tag_fg_color[] = "#555555";
 
-static const char normal_tag_bg_color[] = "#000000CC";
+static const char normal_tag_bg_color[] = "#00000099";
 static const char normal_tag_fg_color[] = "#4B5E73";
 
-static const char current_tag_bg_color[] = "#000000CC";
+static const char current_tag_bg_color[] = "#00000099";
 static const char current_tag_fg_color[] = "#AAAAAA";
 
-static const char selected_tag_bg_color[] = "#000000CC";
+static const char selected_tag_bg_color[] = "#00000099";
 static const char selected_tag_fg_color[] = "#70AAAA";
 
-static const char urgent_tag_bg_color[] = "#000000CC";
+static const char urgent_tag_bg_color[] = "#00000099";
 static const char urgent_tag_fg_color[] = "#FF3F3F";
 
-static const char ltsym_bg_color[] = "#394757CC";
+static const char ltsym_bg_color[] = "#39475799";
 static const char ltsym_fg_color[] = "#CCCCCC";
 
-static const char title_bg_color[] = "#000000CC";
+static const char title_bg_color[] = "#00000099";
 static const char title_fg_color[] = "#AAAAAA";
 
-static const char status_bg_color[] = "#394757CC";
+static const char status_bg_color[] = "#39475799";
 static const char status_fg_color[] = "#CCCCCC";
 
 //
@@ -68,6 +66,7 @@ static int  bar_pos = TOP;            // bar position, TOP or BOTTOM
 //
 
 static char* tags[] = { "M1", "M2", "M3", "M4", "M5", "E6", "E7", "E8", "E9" };
+static int tag_strip_padding = 4; // amount of padding for sides of tag strip
 
 //
 // WINDOW RULES

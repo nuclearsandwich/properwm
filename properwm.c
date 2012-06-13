@@ -374,6 +374,7 @@ void _draw_tag (TagLabel* t) {
     }
 
     cairo_t* cr = cairo_create(t->base.cs);
+    cairo_save(cr);
 
     loft_cairo_set_rgba(cr, bg);
 
@@ -412,7 +413,7 @@ void _draw_tag (TagLabel* t) {
     bool multi = selmon->sel != NULL && selmon->sel->tags != 1 << t->num;
 
     if (client_indicator && t->has_sel && multi) {
-        double ind_x_left = t->base.width / 6;
+        double ind_x_left = t->base.width / 4;
         double ind_x_center = t->base.width / 2;
         double ind_x_right = t->base.width - ind_x_left;
 
@@ -426,6 +427,7 @@ void _draw_tag (TagLabel* t) {
         cairo_fill(cr);
     }
 
+    cairo_restore(cr);
     cairo_destroy(cr);
 }
 
@@ -2309,8 +2311,8 @@ void updatebars (void) {
         m->bar = malloc(sizeof(Bar));
 
         loft_window_init(&m->bar->win, 0);
-        loft_layout_init(&m->bar->lt_main, ASPECT_H, 5);
-        loft_layout_init(&m->bar->lt_tags, ASPECT_H, 0);
+        loft_layout_init(&m->bar->lt_main, ASPECT_H, 0, 0);
+        loft_layout_init(&m->bar->lt_tags, ASPECT_H, tag_strip_padding, 0);
 
         loft_window_set_layout(&m->bar->win, &m->bar->lt_main);
 
@@ -2322,9 +2324,9 @@ void updatebars (void) {
         m->bar->lb_title.base.draw_base = false;
         m->bar->lb_status.base.draw_base = false;
 
-        loft_label_set_padding(&m->bar->lb_layout, 5, 0);
-        loft_label_set_padding(&m->bar->lb_title, 5, 0);
-        loft_label_set_padding(&m->bar->lb_status, 5, 0);
+        loft_label_set_padding(&m->bar->lb_layout, 8, 0);
+        loft_label_set_padding(&m->bar->lb_title, 8, 0);
+        loft_label_set_padding(&m->bar->lb_status, 8, 0);
 
         loft_layout_attach(&m->bar->lt_main, &m->bar->lt_tags.base, EXPAND_Y);
         loft_layout_attach(&m->bar->lt_main, &m->bar->lb_layout.base, EXPAND_Y);
@@ -2378,9 +2380,9 @@ void updatebars (void) {
             cairo_text_extents(cr, tags[i], &ext);
             cairo_font_extents(cr, &f_ext);
 
-            loft_widget_set_minimum_size(&t->base, ext.width + 10, f_ext.height + 8);
-
             cairo_destroy(cr);
+
+            loft_widget_set_minimum_size(&t->base, ext.width + 16, f_ext.height);
 
             // catch events
 
@@ -2869,8 +2871,6 @@ int main (int argc, char *argv[]) {
 
     loftenv.font = (char*) font_name;
     loftenv.font_size = (int) font_size;
-
-    loft_rgba_set_from_str(&loftenv.colors.base, (char*) base_color);
 
     dpy = loftenv.display; 
 
