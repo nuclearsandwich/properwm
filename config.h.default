@@ -66,7 +66,6 @@ static int  bar_pos = TOP;            // bar position, TOP or BOTTOM
 //
 
 static char* tags[] = { "M1", "M2", "M3", "M4", "M5", "E6", "E7", "E8", "E9" };
-static int tag_strip_padding = 4; // amount of padding for sides of tag strip
 
 //
 // WINDOW RULES
