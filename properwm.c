@@ -2324,9 +2324,9 @@ void updatebars (void) {
         m->bar->lb_title.base.draw_base = false;
         m->bar->lb_status.base.draw_base = false;
 
-        loft_label_set_padding(&m->bar->lb_layout, 6, 0);
-        loft_label_set_padding(&m->bar->lb_title, 6, 0);
-        loft_label_set_padding(&m->bar->lb_status, 6, 0);
+        loft_label_set_padding(&m->bar->lb_layout, 8, 0);
+        loft_label_set_padding(&m->bar->lb_title, 8, 0);
+        loft_label_set_padding(&m->bar->lb_status, 8, 0);
 
         loft_layout_attach(&m->bar->lt_main, &m->bar->lt_tags.base, EXPAND_Y);
         loft_layout_attach(&m->bar->lt_main, &m->bar->lb_layout.base, EXPAND_Y);
@@ -2382,7 +2382,7 @@ void updatebars (void) {
 
             cairo_destroy(cr);
 
-            loft_widget_set_minimum_size(&t->base, ext.width + 14, f_ext.height);
+            loft_widget_set_minimum_size(&t->base, ext.width + 16, f_ext.height);
 
             // catch events
 
