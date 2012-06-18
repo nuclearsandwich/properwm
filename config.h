@@ -30,8 +30,8 @@ static const char current_tag_fg_color[] = "#AAAAAA";
 static const char selected_tag_bg_color[] = "#00000099";
 static const char selected_tag_fg_color[] = "#70AAAA";
 
-static const char urgent_tag_bg_color[] = "#00000099";
-static const char urgent_tag_fg_color[] = "#FF3F3F";
+static const char urgent_tag_bg_color[] = "#FF000099";
+static const char urgent_tag_fg_color[] = "#FFFFFF";
 
 static const char ltsym_bg_color[] = "#39475799";
 static const char ltsym_fg_color[] = "#CCCCCC";
@@ -66,6 +66,7 @@ static int  bar_pos = TOP;            // bar position, TOP or BOTTOM
 //
 
 static char* tags[] = { "M1", "M2", "M3", "M4", "M5", "E6", "E7", "E8", "E9" };
+static const int tag_strip_padding = 2;
 
 //
 // WINDOW RULES
