@@ -2328,7 +2328,7 @@ void updatebars (void) {
         loft_label_set_padding(&m->bar->lb_title, 8,0,8,0);
         loft_label_set_padding(&m->bar->lb_status, 8,0,8,0);
 
-        loft_widget_set_preferred_size(&m->bar->lb_layout.base, 50, -1);
+        loft_widget_set_preferred_size(&m->bar->lb_layout.base, 40, -1);
         loft_widget_use_preferred_size(&m->bar->lb_layout.base, true);
 
         loft_layout_attach(&m->bar->lt_main, &m->bar->lt_tags.base, EXPAND_Y);
