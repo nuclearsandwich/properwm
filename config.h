@@ -2,9 +2,9 @@
 // GENERAL APPEARANCE
 //
 
-static const char font_name[] = "Terminus";
-static const int font_size = 12;
-static const int bar_height = 25;
+static const char font_name[] = "Droid Sans";
+static const int font_size = 11;
+static const int bar_height = 28;
 
 //
 // COLORS
@@ -13,7 +13,7 @@ static const int bar_height = 25;
 // 6-digit colors only
 
 static const char normal_border_color[] = "#383838";
-static const char selected_border_color[] = "#ABCC00";
+static const char selected_border_color[] = "#FFFFFF";
 static const char urgent_border_color[] = "#FF0000";
 
 // 8-digit colors optional
@@ -33,13 +33,13 @@ static const char selected_tag_fg_color[] = "#70AAAA";
 static const char urgent_tag_bg_color[] = "#FF000099";
 static const char urgent_tag_fg_color[] = "#FFFFFF";
 
-static const char ltsym_bg_color[] = "#39475799";
+static const char ltsym_bg_color[] = "#55555599";
 static const char ltsym_fg_color[] = "#CCCCCC";
 
 static const char title_bg_color[] = "#00000099";
 static const char title_fg_color[] = "#AAAAAA";
 
-static const char status_bg_color[] = "#39475799";
+static const char status_bg_color[] = "#55555599";
 static const char status_fg_color[] = "#CCCCCC";
 
 //
@@ -52,8 +52,8 @@ enum {
 };
 
 static unsigned int border_width = 1; // window border width
-static unsigned int padding = 10;     // amount of padding between tiled windows
-static unsigned int snap = 10;        // window snap threshold
+static unsigned int padding = 8;     // amount of padding between tiled windows
+static unsigned int snap = 8;        // window snap threshold
 
 static bool click_to_focus = true;    // require click to focus windows with mouse, otherwise automatic
 static bool client_indicator = true;  // draw indicator showing which tag(s) selected client is on
@@ -66,7 +66,6 @@ static int  bar_pos = TOP;            // bar position, TOP or BOTTOM
 //
 
 static char* tags[] = { "M1", "M2", "M3", "M4", "M5", "E6", "E7", "E8", "E9" };
-static const int tag_strip_padding = 2;
 
 //
 // WINDOW RULES
@@ -91,8 +90,8 @@ static Layout layouts[] = {
     /* symbol     arrange function */
     { "ST", stack },
     { "TI", tile },
-    { "FL", NULL },
     { "MO", monocle },
+    { "FL", NULL },
 };
 
 //
@@ -150,8 +149,8 @@ static Key keys[] = {
     { MODKEY|ShiftMask,             XK_c,           killclient,     {0} },
     { MODKEY,                       XK_s,           setlayout,      {.v = &layouts[0]} },
     { MODKEY,                       XK_t,           setlayout,      {.v = &layouts[1]} },
-    { MODKEY,                       XK_f,           setlayout,      {.v = &layouts[2]} },
-    { MODKEY,                       XK_m,           setlayout,      {.v = &layouts[3]} },
+    { MODKEY,                       XK_m,           setlayout,      {.v = &layouts[2]} },
+    { MODKEY,                       XK_f,           setlayout,      {.v = &layouts[3]} },
     { MODKEY,                       XK_space,       togglefloating, {0} },
     { MODKEY,                       XK_0,           view,           {.ui = -1 } },
     { MODKEY|ShiftMask,             XK_0,           tag,            {.ui = -1 } },
@@ -181,7 +180,8 @@ static Button buttons[] = {
     /* click                event mask      button          function        argument */
     { ClkLtSymbol,          0,              Button1,        setlayout,      {.v = &layouts[0]} },
     { ClkLtSymbol,          0,              Button3,        setlayout,      {.v = &layouts[1]} },
-    { ClkLtSymbol,          MODKEY,         Button3,        setlayout,      {.v = &layouts[2]} },
+    { ClkLtSymbol,          MODKEY,         Button1,        setlayout,      {.v = &layouts[2]} },
+    { ClkLtSymbol,          MODKEY,         Button3,        setlayout,      {.v = &layouts[3]} },
     { ClkStatusText,        0,              Button3,        spawn,          {.v = termcmd } },
     { ClkWinTitle,          0,              Button1,        zoom,           {0} },
     { ClkClientWin,         MODKEY,         Button1,        movemouse,      {0} },
