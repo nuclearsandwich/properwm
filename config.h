@@ -2,9 +2,9 @@
 // GENERAL APPEARANCE
 //
 
-static const char font_name[] = "Droid Sans";
-static const int font_size = 11;
-static const int bar_height = 28;
+static const char font_name[] = "Terminus";
+static const int font_size = 10;
+static const int bar_height = 26;
 
 //
 // COLORS
