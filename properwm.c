@@ -388,6 +388,8 @@ void _draw_tag (TagLabel* t) {
     PangoFontDescription* font_desc = pango_font_description_from_string(fstr);
     pango_layout_set_font_description(layout, font_desc);
 
+    free(fstr);
+
     PangoRectangle ink;
     PangoRectangle logical;
 
@@ -405,7 +407,6 @@ void _draw_tag (TagLabel* t) {
     cairo_move_to(cr, x, y);
     pango_cairo_show_layout(cr, layout);
 
-    free(fstr);
 
     pango_font_description_free(font_desc);
     g_object_unref(layout);
@@ -566,7 +567,7 @@ void arrangemon (Monitor *m) {
     if (smart_borders)
         updateborders(m);
 
-    if (m->lts[m->curtag]->arrange)
+    if (m->lts[m->curtag]->arrange != NULL)
         m->lts[m->curtag]->arrange(m);
 }
 
@@ -2232,8 +2233,27 @@ void toggleview (const Arg *arg) {
     unsigned int newtagset = selmon->tagset[selmon->seltags] ^ (arg->ui & TAGMASK);
 
     if (newtagset) {
+        int currentmask = 1 << selmon->curtag;
+
+        // update current tag if it was deselected
+
+        if ((currentmask & newtagset) == false) {
+            unsigned int i = 0;
+            unsigned int mask = 1;
+
+            while (i < LENGTH(tags)) {
+                mask = 1 << i;
+                if (mask & newtagset)
+                    break;
+                i++;
+            }
+
+            selmon->curtag = i;
+        }
+
         selmon->tagset[selmon->seltags] = newtagset;
         focus(NULL);
+        updatebartags(selmon);
         arrange(selmon);
     }
 }
