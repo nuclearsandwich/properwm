@@ -563,6 +563,7 @@ void arrange (Monitor *m) {
 
 void arrangemon (Monitor *m) {
     strncpy(m->ltsymbol, m->lts[m->curtag]->symbol, sizeof(m->ltsymbol));
+    updatebarlayout(m);
 
     if (smart_borders)
         updateborders(m);
@@ -2233,11 +2234,9 @@ void toggleview (const Arg *arg) {
     unsigned int newtagset = selmon->tagset[selmon->seltags] ^ (arg->ui & TAGMASK);
 
     if (newtagset) {
-        int currentmask = 1 << selmon->curtag;
-
         // update current tag if it was deselected
 
-        if ((currentmask & newtagset) == false) {
+        if (((1 << selmon->curtag) & newtagset) == false) {
             unsigned int i = 0;
             unsigned int mask = 1;
 
@@ -2253,7 +2252,6 @@ void toggleview (const Arg *arg) {
 
         selmon->tagset[selmon->seltags] = newtagset;
         focus(NULL);
-        updatebartags(selmon);
         arrange(selmon);
     }
 }
@@ -2812,10 +2810,7 @@ void view (const Arg *arg) {
     }
 
     focus(selmon->focus[selmon->curtag]);
-    updatebartags(selmon);
-
     arrange(selmon);
-    updatebarlayout(selmon);
 }
 
 Client* wintoclient (Window w) {
