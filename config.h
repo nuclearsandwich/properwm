@@ -12,35 +12,35 @@ static const int bar_height = 26;
 
 // 6-digit colors only
 
-static const char normal_border_color[] = "#383838";
-static const char selected_border_color[] = "#DDDDDD";
+static const char normal_border_color[] = "#222222";
+static const char selected_border_color[] = "#BFBFBF";
 static const char urgent_border_color[] = "#FF0000";
 
 // 8-digit colors optional
 
-static const char unused_tag_bg_color[] = "#00000099";
-static const char unused_tag_fg_color[] = "#555555";
+static const char unused_tag_bg_color[] = "#000000CC";
+static const char unused_tag_fg_color[] = "#808080";
 
-static const char normal_tag_bg_color[] = "#00000099";
-static const char normal_tag_fg_color[] = "#4B5E73";
+static const char normal_tag_bg_color[] = "#000000CC";
+static const char normal_tag_fg_color[] = "#628AB3";
 
-static const char current_tag_bg_color[] = "#00000099";
-static const char current_tag_fg_color[] = "#AAAAAA";
+static const char current_tag_bg_color[] = "#000000CC";
+static const char current_tag_fg_color[] = "#BFBFBF";
 
-static const char selected_tag_bg_color[] = "#00000099";
-static const char selected_tag_fg_color[] = "#70AAAA";
+static const char selected_tag_bg_color[] = "#000000CC";
+static const char selected_tag_fg_color[] = "#B39462";
 
-static const char urgent_tag_bg_color[] = "#FF000099";
+static const char urgent_tag_bg_color[] = "#FF0000CC";
 static const char urgent_tag_fg_color[] = "#FFFFFF";
 
-static const char ltsym_bg_color[] = "#55555599";
-static const char ltsym_fg_color[] = "#CCCCCC";
+static const char ltsym_bg_color[] = "#222222CC";
+static const char ltsym_fg_color[] = "#BFBFBF";
 
-static const char title_bg_color[] = "#00000099";
-static const char title_fg_color[] = "#AAAAAA";
+static const char title_bg_color[] = "#000000CC";
+static const char title_fg_color[] = "#BFBFBF";
 
-static const char status_bg_color[] = "#55555599";
-static const char status_fg_color[] = "#CCCCCC";
+static const char status_bg_color[] = "#222222CC";
+static const char status_fg_color[] = "#BFBFBF";
 
 //
 // GENERAL SETTINGS
