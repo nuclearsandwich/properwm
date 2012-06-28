@@ -30,7 +30,7 @@ static const char current_tag_fg_color[] = "#BFBFBF";
 static const char selected_tag_bg_color[] = "#000000CC";
 static const char selected_tag_fg_color[] = "#B39462";
 
-static const char urgent_tag_bg_color[] = "#FF0000CC";
+static const char urgent_tag_bg_color[] = "#990000CC";
 static const char urgent_tag_fg_color[] = "#FFFFFF";
 
 static const char ltsym_bg_color[] = "#222222CC";
@@ -42,6 +42,15 @@ static const char title_fg_color[] = "#BFBFBF";
 static const char status_bg_color[] = "#222222CC";
 static const char status_fg_color[] = "#BFBFBF";
 
+static const char dash_btn_bg_color[] = "#000000CC";
+static const char dash_btn_fg_color[] = "#808080";
+
+static const char dash_btn_prelight_bg_color[] = "#000000CC";
+static const char dash_btn_prelight_fg_color[] = "#808080";
+
+static const char dash_btn_active_bg_color[] = "#BFBFBFCC";
+static const char dash_btn_active_fg_color[] = "#000000";
+
 //
 // GENERAL SETTINGS
 //
@@ -51,15 +60,17 @@ enum {
     BOTTOM
 };
 
-static unsigned int border_width = 1; // window border width
-static unsigned int padding = 8;     // amount of padding between tiled windows
-static unsigned int snap = 8;        // window snap threshold
+static char dash_btn_text[] = "+";      // dashboard button text
 
-static bool click_to_focus = true;    // require click to focus windows with mouse, otherwise automatic
-static bool client_indicator = true;  // draw indicator showing which tag(s) selected client is on
-static bool smart_borders = true;     // enable borders only when necessary
-static bool show_bar = true;          // bar visibility
-static int  bar_pos = TOP;            // bar position, TOP or BOTTOM
+static unsigned int border_width = 1;   // window border width
+static unsigned int padding = 8;        // amount of padding between tiled windows
+static unsigned int snap = 8;           // window snap threshold
+
+static bool click_to_focus = true;      // require click to focus windows with mouse, otherwise automatic
+static bool client_indicator = true;    // draw indicator showing which tag(s) selected client is on
+static bool smart_borders = true;       // enable borders only when necessary
+static bool show_bar = true;            // bar visibility
+static int  bar_pos = TOP;              // bar position, TOP or BOTTOM
 
 //
 // TAGS

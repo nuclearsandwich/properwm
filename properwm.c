@@ -40,7 +40,7 @@
 #define CLEANMASK(mask)         (mask & ~(numlockmask|LockMask) & (ShiftMask|ControlMask|Mod1Mask|Mod2Mask|Mod3Mask|Mod4Mask|Mod5Mask))
 #define INTERSECT(x,y,w,h,m)    (_MAX(0, _MIN((x)+(w),(m)->wx+(m)->ww) - _MAX((x),(m)->wx)) \
                                * _MAX(0, _MIN((y)+(h),(m)->wy+(m)->wh) - _MAX((y),(m)->wy)))
-#define ISVISIBLE(C)            ((C->tags & C->mon->tagset[C->mon->seltags]))
+#define ISVISIBLE(C)            ((C->tags & C->mon->tagset[C->mon->selected_tags]))
 #define LENGTH(X)               (sizeof X / sizeof X[0])
 #define _MAX(A, B)               ((A) > (B) ? (A) : (B))
 #define _MIN(A, B)               ((A) < (B) ? (A) : (B))
@@ -263,15 +263,6 @@ typedef enum StrutPosition {
     STRUT_RIGHT
 } StrutPosition;
 
-typedef struct Bar {
-    LoftWindow win;
-    LoftLayout lt_main;
-    LoftLayout lt_tags;
-    LoftLabel lb_layout;
-    LoftLabel lb_title;
-    LoftLabel lb_status;
-} Bar;
-
 typedef struct TagLabel {
     LoftWidget base;
 
@@ -292,42 +283,55 @@ typedef struct TagLabel {
     bool urgent;
 } TagLabel;
 
+typedef struct Bar {
+    LoftWindow win;
+    LoftLayout lt_main;
+
+    LoftLayout lt_tagstrip;
+    TagLabel* lb_tags;
+
+    LoftLabel lb_layout;
+    LoftLabel lb_title;
+    LoftLabel lb_status;
+    LoftButton dash_btn;
+} Bar;
+
 struct Monitor {
     int num;
-    int by;               /* bar geometry */
+
     int mx, my, mw, mh;   /* screen size */
     int wx, wy, ww, wh;   /* window area  */
 
-    int struts[4];
+    unsigned int current_tag;
+    unsigned int previous_tag;
 
-    unsigned int curtag;
-    unsigned int prevtag;
-
-    char ltsymbol[16];
-    unsigned int seltags;
-    unsigned int sellt;
+    unsigned int selected_tags;
+    unsigned int selected_lt;
     unsigned int tagset[2];
 
-    bool show_bar;
-    bool bar_pos;
-
     Client *clients;
-    Client *sel;
+    Client *selected;
     Client *stack;
 
     Bar* bar;
-    TagLabel* lb_tags;
+    bool bar_pos;
+    int bar_y;
+    bool show_bar;
 
-    Client* focus[LENGTH(tags)];
+    LoftWindow dashboard;
+
+    Client* tagfocus[LENGTH(tags)];
     float mfacts[LENGTH(tags)];
     int nmasters[LENGTH(tags)];
-    const Layout *lts[LENGTH(tags)];
+    const Layout *layouts[LENGTH(tags)];
+
+    int struts[4];
+    char ltsymbol[16];
 
     Monitor *next;
 };
 
 struct CheckTags { char limitexceeded[LENGTH(tags) > 31 ? -1 : 1]; };
-
 
 // SIGNAL CALLBACKS
 
@@ -411,7 +415,7 @@ void _draw_tag (TagLabel* t) {
     pango_font_description_free(font_desc);
     g_object_unref(layout);
 
-    bool multi = selmon->sel != NULL && selmon->sel->tags != 1 << t->num;
+    bool multi = selmon->selected != NULL && selmon->selected->tags != 1 << t->num;
 
     if (client_indicator && t->has_sel && multi) {
         double ind_x_left = t->base.width / 4;
@@ -430,6 +434,17 @@ void _draw_tag (TagLabel* t) {
 
     cairo_restore(cr);
     cairo_destroy(cr);
+}
+
+void _on_dash_btn_activate (LoftButton* dash_btn) {
+    loft_widget_show(&selmon->dashboard.base);
+    XRaiseWindow(loftenv.display, selmon->dashboard.base.xwin);
+    XSetInputFocus(dpy, selmon->dashboard.base.xwin, RevertToPointerRoot, CurrentTime);
+}
+
+void _on_dash_btn_deactivate (LoftButton* dash_btn) {
+    loft_widget_hide(&selmon->dashboard.base);
+    focus(selmon->tagfocus[selmon->current_tag]);
 }
 
 // - - - - - - - - - - -
@@ -466,7 +481,7 @@ void applyrules (Client *c) {
     if (ch.res_name)
         XFree(ch.res_name);
 
-    c->tags = c->tags & TAGMASK ? c->tags & TAGMASK : c->mon->tagset[c->mon->seltags];
+    c->tags = c->tags & TAGMASK ? c->tags & TAGMASK : c->mon->tagset[c->mon->selected_tags];
 }
 
 bool applysizehints (Client *c, int *x, int *y, int *w, int *h, bool interact) {
@@ -502,7 +517,7 @@ bool applysizehints (Client *c, int *x, int *y, int *w, int *h, bool interact) {
     if (*w < bh)
         *w = bh;
 
-    if (tiled_size_hints || c->isfloating || c->mon->lts[c->mon->curtag]->arrange == NULL) {
+    if (tiled_size_hints || c->isfloating || c->mon->layouts[c->mon->current_tag]->arrange == NULL) {
         /* see last two sentences in ICCCM 4.1.2.3 */
 
         baseismin = c->basew == c->minw && c->baseh == c->minh;
@@ -562,14 +577,14 @@ void arrange (Monitor *m) {
 }
 
 void arrangemon (Monitor *m) {
-    strncpy(m->ltsymbol, m->lts[m->curtag]->symbol, sizeof(m->ltsymbol));
+    strncpy(m->ltsymbol, m->layouts[m->current_tag]->symbol, sizeof(m->ltsymbol));
     updatebarlayout(m);
 
     if (smart_borders)
         updateborders(m);
 
-    if (m->lts[m->curtag]->arrange != NULL)
-        m->lts[m->curtag]->arrange(m);
+    if (m->layouts[m->current_tag]->arrange != NULL)
+        m->layouts[m->current_tag]->arrange(m);
 }
 
 void attach (Client *c) {
@@ -594,7 +609,7 @@ void buttonpress (XEvent *e) {
     m = wintomon(ev->window);
 
     if (m != NULL && m != selmon) {
-        unfocus(selmon->sel, true);
+        unfocus(selmon->selected, true);
         selmon = m;
         focus(NULL);
     }
@@ -633,7 +648,7 @@ void cleanup (void) {
     Monitor *m;
 
     view(&a);
-    selmon->lts[selmon->curtag] = &foo;
+    selmon->layouts[selmon->current_tag] = &foo;
 
     for(m = mons; m; m = m->next)
         while(m->stack)
@@ -663,14 +678,14 @@ void cleanupmon (Monitor *mon) {
 
     int i;
     for (i = 0; i < LENGTH(tags); i++)
-        loft_widget_destroy(&mon->lb_tags[i].base);
+        loft_widget_destroy(&mon->bar->lb_tags[i].base);
 
-    free(mon->lb_tags);
+    free(mon->bar->lb_tags);
 
     loft_widget_destroy(&mon->bar->lb_layout.base);
     loft_widget_destroy(&mon->bar->lb_title.base);
     loft_widget_destroy(&mon->bar->lb_status.base);
-    loft_widget_destroy(&mon->bar->lt_tags.base);
+    loft_widget_destroy(&mon->bar->lt_tagstrip.base);
     loft_widget_destroy(&mon->bar->lt_main.base);
 
     free(mon->bar);
@@ -705,8 +720,8 @@ void clientmessage (XEvent *e) {
     }
     else if (cme->message_type == netatom[NetActiveWindow]) {
         if (!ISVISIBLE(c)) {
-            c->mon->seltags ^= 1;
-            c->mon->tagset[c->mon->seltags] = c->tags;
+            c->mon->selected_tags ^= 1;
+            c->mon->tagset[c->mon->selected_tags] = c->tags;
         }
         pop(c);
     }
@@ -744,7 +759,7 @@ void configurenotify (XEvent *e) {
             updatebars();
 
             for (m = mons; m; m = m->next) {
-                loft_widget_move(&m->bar->win.base, m->mx, m->by);
+                loft_widget_move(&m->bar->win.base, m->mx, m->bar_y);
                 loft_widget_resize(&m->bar->win.base, m->mw, m->mh);
             }
 
@@ -764,7 +779,7 @@ void configurerequest (XEvent *e) {
     if (c != NULL) {
         if (ev->value_mask & CWBorderWidth)
             c->bw = ev->border_width;
-        else if (c->isfloating || !selmon->lts[selmon->curtag]->arrange) {
+        else if (c->isfloating || !selmon->layouts[selmon->current_tag]->arrange) {
             m = c->mon;
             if (ev->value_mask & CWX) {
                 c->oldx = c->x;
@@ -812,24 +827,35 @@ void configurerequest (XEvent *e) {
 }
 
 Monitor* createmon (void) {
+    int i;
+
     Monitor *m;
 
     if (!(m = (Monitor *)calloc(1, sizeof(Monitor))))
         die("fatal: could not malloc() %u bytes\n", sizeof(Monitor));
 
-    m->by = 0;
-
-    m->prevtag = m->curtag = 0;
+    m->current_tag = 0;
+    m->previous_tag = 0;
     m->tagset[0] = m->tagset[1] = 1;
-    m->show_bar = show_bar;
-    m->bar_pos = bar_pos;
 
-    m->sel = NULL;
+    m->clients = NULL;
+    m->selected = NULL;
+    m->stack = NULL;
 
     m->bar = NULL;
-    m->lb_tags = NULL;
+    m->bar_pos = bar_pos;
+    m->bar_y = 0;
+    m->show_bar = show_bar;
 
-    int i;
+    loft_window_init(&m->dashboard, 5);
+    loft_widget_override_redirect(&m->dashboard.base, true);
+
+    for (i = 0; i < LENGTH(tags); i++) {
+        m->tagfocus[i] = NULL;
+        m->layouts[i] = &layouts[0];
+        m->mfacts[i] = mfact;
+        m->nmasters[i] = nmaster;
+    }
 
     for (i = 0; i < 4; i++) {
         if (m->show_bar && ((i == STRUT_TOP && m->bar_pos == TOP) || (i == STRUT_BOTTOM && m->bar_pos == BOTTOM)))
@@ -839,15 +865,8 @@ Monitor* createmon (void) {
     }
 
     updatestruts(m);
-
-    for (i = 0; i < LENGTH(tags); i++) {
-        m->focus[i] = NULL;
-        m->lts[i] = &layouts[0];
-        m->mfacts[i] = mfact;
-        m->nmasters[i] = nmaster;
-    }
-
     strncpy(m->ltsymbol, layouts[0].symbol, sizeof(m->ltsymbol));
+
     return m;
 }
 
@@ -872,9 +891,9 @@ void detachstack (Client *c) {
     for (tc = &c->mon->stack; *tc && *tc != c; tc = &(*tc)->snext);
     *tc = c->snext;
 
-    if (c == c->mon->sel) {
+    if (c == c->mon->selected) {
         for (t = c->mon->stack; t && ISVISIBLE(t) == false; t = t->snext);
-        c->mon->sel = t;
+        c->mon->selected = t;
     }
 }
 
@@ -917,10 +936,10 @@ void enternotify (XEvent *e) {
     m = c ? c->mon : wintomon(ev->window);
 
     if (m != selmon) {
-        unfocus(selmon->sel, true);
+        unfocus(selmon->selected, true);
         selmon = m;
     }
-    else if (c == NULL || c == selmon->sel)
+    else if (c == NULL || c == selmon->selected)
         return;
 
     focus(c);
@@ -930,26 +949,31 @@ void focus (Client *c) {
     if (c == NULL || ISVISIBLE(c) == false)
         for (c = selmon->stack; c != NULL && ISVISIBLE(c) == false; c = c->snext);
 
-    if (selmon->sel && selmon->sel != c)
-        unfocus(selmon->sel, false);
+    if (selmon->selected && selmon->selected != c)
+        unfocus(selmon->selected, false);
 
     if (c) {
         if (c->mon != selmon)
             selmon = c->mon;
+
         if (c->isurgent)
             clearurgent(c);
+
         detachstack(c);
         attachstack(c);
-        grabbuttons(c, true);
         XSetWindowBorder(dpy, c->win, border_selected);
-        setfocus(c);
+
+        if (c->mon->dashboard.base.visible == false) {
+            grabbuttons(c, true);
+            setfocus(c);
+        }
     } else {
         XSetInputFocus(dpy, root, RevertToPointerRoot, CurrentTime);
         XDeleteProperty(dpy, root, netatom[NetActiveWindow]);
     }
 
-    selmon->sel = c;
-    selmon->focus[selmon->curtag] = c;
+    selmon->selected = c;
+    selmon->tagfocus[selmon->current_tag] = c;
 
     updatebartags(selmon);
     updatebartitle(selmon);
@@ -958,8 +982,8 @@ void focus (Client *c) {
 void focusin (XEvent *e) { /* there are some broken focus acquiring clients */
     XFocusChangeEvent *ev = &e->xfocus;
 
-    if (selmon->sel && ev->window != selmon->sel->win)
-        setfocus(selmon->sel);
+    if (selmon->selected && ev->window != selmon->selected->win)
+        setfocus(selmon->selected);
 }
 
 void focusmon (const Arg *arg) {
@@ -972,7 +996,7 @@ void focusmon (const Arg *arg) {
     if (m == selmon)
         return;
 
-    unfocus(selmon->sel, true);
+    unfocus(selmon->selected, true);
     selmon = m;
     focus(NULL);
 }
@@ -980,15 +1004,15 @@ void focusmon (const Arg *arg) {
 void focusstack (const Arg *arg) {
     Client *c = NULL, *i;
 
-    if (selmon->sel == NULL)
+    if (selmon->selected == NULL)
         return;
 
     if (arg->i > 0) {
-        for (c = selmon->sel->next; c && !ISVISIBLE(c); c = c->next);
+        for (c = selmon->selected->next; c && !ISVISIBLE(c); c = c->next);
         if (c == NULL)
             for (c = selmon->clients; c && !ISVISIBLE(c); c = c->next);
     } else {
-        for (i = selmon->clients; i != selmon->sel; i = i->next)
+        for (i = selmon->clients; i != selmon->selected; i = i->next)
             if (ISVISIBLE(i))
                 c = i;
         if (c == NULL)
@@ -1115,7 +1139,7 @@ void grabkeys (void) {
 }
 
 void incnmaster (const Arg *arg) {
-    selmon->nmasters[selmon->curtag] = _MAX(selmon->nmasters[selmon->curtag] + arg->i, 0);
+    selmon->nmasters[selmon->current_tag] = _MAX(selmon->nmasters[selmon->current_tag] + arg->i, 0);
     arrange(selmon);
 }
 
@@ -1160,14 +1184,14 @@ void keypress (XEvent *e) {
 }
 
 void killclient (const Arg *arg) {
-    if (!selmon->sel)
+    if (!selmon->selected)
         return;
 
-    if (!sendevent(selmon->sel, wmatom[WMDelete])) {
+    if (!sendevent(selmon->selected, wmatom[WMDelete])) {
         XGrabServer(dpy);
         XSetErrorHandler(xerrordummy);
         XSetCloseDownMode(dpy, DestroyAll);
-        XKillClient(dpy, selmon->sel->win);
+        XKillClient(dpy, selmon->selected->win);
         XSync(dpy, false);
         XSetErrorHandler(xerror);
         XUngrabServer(dpy);
@@ -1208,7 +1232,7 @@ void manage (Window w, XWindowAttributes *wa) {
 
     c->x = _MAX(c->x, c->mon->mx);
     /* only fix client y-offset, ifthe client center might cover the bar */
-    c->y = _MAX(c->y, ((c->mon->by == c->mon->my) && (c->x + (c->w / 2) >= c->mon->wx)
+    c->y = _MAX(c->y, ((c->mon->bar_y == c->mon->my) && (c->x + (c->w / 2) >= c->mon->wx)
                && (c->x + (c->w / 2) < c->mon->wx + c->mon->ww)) ? bh : c->mon->my);
 
     updatewindowtype(c);
@@ -1218,8 +1242,8 @@ void manage (Window w, XWindowAttributes *wa) {
     if (c->isfloating == false)
         c->isfloating = c->oldstate = trans != None || c->isfixed;
 
-    if (c->isfullscreen || (smart_borders && c->mon->lts[c->mon->curtag]->arrange != NULL && c->isfloating == false
-    && (c->mon->lts[c->mon->curtag]->arrange == &monocle || ntiled(c->mon) == 0)))
+    if (c->isfullscreen || (smart_borders && c->mon->layouts[c->mon->current_tag]->arrange != NULL && c->isfloating == false
+    && (c->mon->layouts[c->mon->current_tag]->arrange == &monocle || ntiled(c->mon) == 0)))
         c->bw = 0;
     else
         c->bw = border_width;
@@ -1233,8 +1257,10 @@ void manage (Window w, XWindowAttributes *wa) {
     XSelectInput(dpy, w, EnterWindowMask|FocusChangeMask|PropertyChangeMask|StructureNotifyMask);
     grabbuttons(c, false);
 
-    if (c->isfloating)
+    if (c->isfloating) {
         XRaiseWindow(dpy, c->win);
+        XRaiseWindow(dpy, c->mon->dashboard.base.xwin);
+    }
 
     attach(c);
     attachstack(c);
@@ -1246,8 +1272,8 @@ void manage (Window w, XWindowAttributes *wa) {
     setclientstate(c, NormalState);
 
     if (c->mon == selmon)
-        unfocus(selmon->sel, false);
-    c->mon->sel = c;
+        unfocus(selmon->selected, false);
+    c->mon->selected = c;
 
     arrange(c->mon);
     XMapWindow(dpy, c->win);
@@ -1300,7 +1326,7 @@ void motionnotify (XEvent *e) {
     if (ev->window != root)
         return;
     if ((m = recttomon(ev->x_root, ev->y_root, 1, 1)) != mon && mon) {
-        unfocus(selmon->sel, true);
+        unfocus(selmon->selected, true);
         selmon = m;
         focus(NULL);
     }
@@ -1313,7 +1339,7 @@ void movemouse (const Arg *arg) {
     Monitor *m;
     XEvent ev;
 
-    if (!(c = selmon->sel))
+    if (!(c = selmon->selected))
         return;
 
     restack(selmon);
@@ -1368,10 +1394,10 @@ void movemouse (const Arg *arg) {
                     ny = selmon->wy + selmon->wh - HEIGHT(c);
             }
 
-            if (c->isfloating == false && selmon->lts[selmon->curtag]->arrange && (ev.xmotion.x < x - snap || ev.xmotion.x > x + snap || ev.xmotion.y < y - snap || ev.xmotion.y > y + snap))
+            if (c->isfloating == false && selmon->layouts[selmon->current_tag]->arrange && (ev.xmotion.x < x - snap || ev.xmotion.x > x + snap || ev.xmotion.y < y - snap || ev.xmotion.y > y + snap))
                 togglefloating(NULL);
 
-            if (c->isfloating || selmon->lts[selmon->curtag]->arrange == NULL) {
+            if (c->isfloating || selmon->layouts[selmon->current_tag]->arrange == NULL) {
                 if (c->isfullscreen)
                     setfullscreen(c, false);
                 resize(c, nx, ny, c->w, c->h, true);
@@ -1449,7 +1475,7 @@ void propertynotify (XEvent *e) {
 
         if (ev->atom == XA_WM_NAME || ev->atom == netatom[NetWMName]) {
             updatetitle(c);
-            if (c == c->mon->sel)
+            if (c == c->mon->selected)
                 updatebartitle(c->mon);
         }
 
@@ -1459,7 +1485,7 @@ void propertynotify (XEvent *e) {
 }
 
 void pushdown (const Arg *arg) {
-    Client *sel = selmon->sel;
+    Client *sel = selmon->selected;
     Client *c;
 
     if (sel == NULL || sel->isfloating)
@@ -1483,7 +1509,7 @@ void pushdown (const Arg *arg) {
 }
 
 void pushup (const Arg *arg) {
-    Client *sel = selmon->sel;
+    Client *sel = selmon->selected;
     Client *c;
 
     if (sel == NULL || sel->isfloating)
@@ -1530,7 +1556,7 @@ Monitor* recttomon (int x, int y, int w, int h) {
 }
 
 void resetnmaster (const Arg *arg) {
-    selmon->nmasters[selmon->curtag] = nmaster;
+    selmon->nmasters[selmon->current_tag] = nmaster;
     arrange(selmon);
 }
 
@@ -1569,10 +1595,10 @@ void resizemouse (const Arg *arg) {
     Monitor *m;
     XEvent ev;
 
-    if (selmon->sel == NULL)
+    if (selmon->selected == NULL)
         return;
 
-    c = selmon->sel;
+    c = selmon->selected;
 
     restack(selmon);
     ocx = c->x;
@@ -1598,12 +1624,12 @@ void resizemouse (const Arg *arg) {
             if (c->mon->wx + nw >= selmon->wx && c->mon->wx + nw <= selmon->wx + selmon->ww
             && c->mon->wy + nh >= selmon->wy && c->mon->wy + nh <= selmon->wy + selmon->wh)
             {
-                if (!c->isfloating && selmon->lts[selmon->curtag]->arrange
+                if (!c->isfloating && selmon->layouts[selmon->current_tag]->arrange
                 && (abs(nw - c->w) > snap || abs(nh - c->h) > snap))
                     togglefloating(NULL);
             }
 
-            if (!selmon->lts[selmon->curtag]->arrange || c->isfloating) {
+            if (!selmon->layouts[selmon->current_tag]->arrange || c->isfloating) {
                 if (c->isfullscreen)
                     setfullscreen(c, false);
                 resize(c, c->x, c->y, nw, nh, true);
@@ -1629,13 +1655,13 @@ void restack (Monitor *m) {
     XEvent ev;
     XWindowChanges wc;
 
-    if (m->sel == NULL)
+    if (m->selected == NULL)
         return;
 
-    if (m->sel->isfloating || m->lts[m->curtag]->arrange == NULL)
-        XRaiseWindow(dpy, m->sel->win);
+    if (m->dashboard.base.visible == false && (m->selected->isfloating || m->layouts[m->current_tag]->arrange == NULL))
+        XRaiseWindow(dpy, m->selected->win);
 
-    if (m->lts[m->curtag]->arrange) {
+    if (m->layouts[m->current_tag]->arrange) {
         wc.stack_mode = Below;
         wc.sibling = m->bar->win.base.xwin;
 
@@ -1695,7 +1721,7 @@ void sendmon (Client *c, Monitor *m) {
     detach(c);
     detachstack(c);
     c->mon = m;
-    c->tags = m->tagset[m->seltags]; // assign tags of target monitor
+    c->tags = m->tagset[m->selected_tags]; // assign tags of target monitor
     attach(c);
     attachstack(c);
     focus(NULL);
@@ -1746,14 +1772,17 @@ void setfullscreen (Client *c, bool fullscreen) {
     if (fullscreen) {
         XChangeProperty(dpy, c->win, netatom[NetWMState], XA_ATOM, 32,
                         PropModeReplace, (unsigned char*)&netatom[NetWMFullscreen], 1);
+
         c->isfullscreen = true;
         c->oldbw = c->bw;
         c->bw = 0;
         c->oldstate = c->isfloating;
         c->isfloating = true;
-        resizeclient(c, c->mon->mx, c->mon->my, c->mon->mw, c->mon->mh);
+
         if (smart_borders)
             updateborders(c->mon);
+
+        resizeclient(c, c->mon->mx, c->mon->my, c->mon->mw, c->mon->mh);
         XRaiseWindow(dpy, c->win);
     }
     else {
@@ -1773,16 +1802,16 @@ void setfullscreen (Client *c, bool fullscreen) {
 }
 
 void setlayout (const Arg *arg) {
-    if (!arg || !arg->v || arg->v == selmon->lts[selmon->curtag])
+    if (!arg || !arg->v || arg->v == selmon->layouts[selmon->current_tag])
         return;
 
     if (arg && arg->v)
-        selmon->lts[selmon->curtag] = (Layout *)arg->v;
+        selmon->layouts[selmon->current_tag] = (Layout *)arg->v;
 
-    strncpy(selmon->ltsymbol, selmon->lts[selmon->curtag]->symbol, sizeof(selmon->ltsymbol));
+    strncpy(selmon->ltsymbol, selmon->layouts[selmon->current_tag]->symbol, sizeof(selmon->ltsymbol));
     updatebarlayout(selmon);
 
-    if (selmon->sel)
+    if (selmon->selected)
         arrange(selmon);
 }
 
@@ -1790,15 +1819,15 @@ void setlayout (const Arg *arg) {
 void setmfact (const Arg *arg) {
     float f;
 
-    if (arg == NULL || selmon->lts[selmon->curtag]->arrange == NULL)
+    if (arg == NULL || selmon->layouts[selmon->current_tag]->arrange == NULL)
         return;
 
-    f = arg->f < 1.0 ? arg->f + selmon->mfacts[selmon->curtag] : arg->f - 1.0;
+    f = arg->f < 1.0 ? arg->f + selmon->mfacts[selmon->current_tag] : arg->f - 1.0;
 
     if (f < 0.1 || f > 0.9)
         return;
 
-    selmon->mfacts[selmon->curtag] = f;
+    selmon->mfacts[selmon->current_tag] = f;
     arrange(selmon);
 }
 
@@ -1902,7 +1931,7 @@ void showhide (Client *c) {
     /* show clients top down */
     if (ISVISIBLE(c)) {
         XMoveWindow(dpy, c->win, c->x, c->y);
-        if ((c->mon->lts[c->mon->curtag]->arrange == NULL || c->isfloating) && c->isfullscreen == false)
+        if ((c->mon->layouts[c->mon->current_tag]->arrange == NULL || c->isfloating) && c->isfullscreen == false)
             resize(c, c->x, c->y, c->w, c->h, false);
         showhide(c->snext);
     }
@@ -1948,18 +1977,18 @@ void stack (Monitor *m) {
 
     n = ntiled(m);
 
-    if (n <= m->nmasters[m->curtag]) {
+    if (n <= m->nmasters[m->current_tag]) {
         if (n > 2)
             nm = n-1;
         else
             nm = 1;
     } else
-        nm = m->nmasters[m->curtag];
+        nm = m->nmasters[m->current_tag];
 
     ns = n-nm;
 
     if (n > nm)
-        mh = nm ? m->wh * m->mfacts[m->curtag] : 0;
+        mh = nm ? m->wh * m->mfacts[m->current_tag] : 0;
     else
         mh = m->wh;
 
@@ -2034,8 +2063,8 @@ void stack (Monitor *m) {
 }
 
 void tag (const Arg *arg) {
-    if (selmon->sel && arg->ui & TAGMASK) {
-        selmon->sel->tags = arg->ui & TAGMASK;
+    if (selmon->selected && arg->ui & TAGMASK) {
+        selmon->selected->tags = arg->ui & TAGMASK;
         focus(NULL);
         updatebartags(selmon);
         arrange(selmon);
@@ -2043,11 +2072,11 @@ void tag (const Arg *arg) {
 }
 
 void tagmon (const Arg *arg) {
-    if (selmon->sel == NULL || mons->next == NULL)
+    if (selmon->selected == NULL || mons->next == NULL)
         return;
 
     Monitor* newmon = dirtomon(arg->i);
-    sendmon(selmon->sel, newmon);
+    sendmon(selmon->selected, newmon);
 
     updatebartags(selmon);
     updatebartags(newmon);
@@ -2069,18 +2098,18 @@ void tile (Monitor *m) {
 
     n = ntiled(m);
 
-    if (n <= m->nmasters[m->curtag]) {
+    if (n <= m->nmasters[m->current_tag]) {
         if (n > 2)
             nm = n-1;
         else
             nm = 1;
     } else
-        nm = m->nmasters[m->curtag];
+        nm = m->nmasters[m->current_tag];
 
     nt = n-nm;
 
     if (n > nm)
-        mw = nm ? m->ww * m->mfacts[m->curtag] : 0;
+        mw = nm ? m->ww * m->mfacts[m->current_tag] : 0;
     else
         mw = m->ww;
 
@@ -2176,41 +2205,41 @@ void togglebarpos (const Arg *arg) {
     updatestruts(selmon);
 
     if (selmon->bar_pos == TOP)
-        selmon->by = selmon->my;
+        selmon->bar_y = selmon->my;
     else
-        selmon->by = selmon->my + (selmon->mh - bh);
+        selmon->bar_y = selmon->my + (selmon->mh - bh);
 
-    loft_widget_move(&selmon->bar->win.base, selmon->mx, selmon->by);
+    loft_widget_move(&selmon->bar->win.base, selmon->mx, selmon->bar_y);
     arrange(selmon);
 
     updatebartags(selmon);
 }
 
 void togglefloating (const Arg *arg) {
-    if (selmon->sel == NULL)
+    if (selmon->selected == NULL)
         return;
 
-    selmon->sel->isfloating = !selmon->sel->isfloating || selmon->sel->isfixed;
+    selmon->selected->isfloating = !selmon->selected->isfloating || selmon->selected->isfixed;
 
     int oldw;
     int oldh;
 
-    if (selmon->sel->isfloating && selmon->sel->bw == 0) {
-        oldw = WIDTH(selmon->sel);
-        oldh = HEIGHT(selmon->sel);
+    if (selmon->selected->isfloating && selmon->selected->bw == 0) {
+        oldw = WIDTH(selmon->selected);
+        oldh = HEIGHT(selmon->selected);
 
-        selmon->sel->bw = border_width;
+        selmon->selected->bw = border_width;
 
-        resize(selmon->sel, selmon->sel->x, selmon->sel->y, oldw, oldh, false);
+        resize(selmon->selected, selmon->selected->x, selmon->selected->y, oldw, oldh, false);
 
-        if (WIDTH(selmon->sel) > oldw && HEIGHT(selmon->sel) > oldh)
-            resize(selmon->sel, selmon->sel->x, selmon->sel->y, oldw - (2*selmon->sel->bw), oldh - (2*selmon->sel->bw), false);
+        if (WIDTH(selmon->selected) > oldw && HEIGHT(selmon->selected) > oldh)
+            resize(selmon->selected, selmon->selected->x, selmon->selected->y, oldw - (2*selmon->selected->bw), oldh - (2*selmon->selected->bw), false);
 
-        if (WIDTH(selmon->sel) < oldw && HEIGHT(selmon->sel) < oldh)
-            resize(selmon->sel, selmon->sel->x, selmon->sel->y, oldw, oldh, false);
+        if (WIDTH(selmon->selected) < oldw && HEIGHT(selmon->selected) < oldh)
+            resize(selmon->selected, selmon->selected->x, selmon->selected->y, oldw, oldh, false);
     }
-    else if (selmon->sel->isfullscreen)
-        setfullscreen(selmon->sel, false);
+    else if (selmon->selected->isfullscreen)
+        setfullscreen(selmon->selected, false);
 
     arrange(selmon);
 }
@@ -2218,25 +2247,25 @@ void togglefloating (const Arg *arg) {
 void toggletag (const Arg *arg) {
     unsigned int newtags;
 
-    if (selmon->sel == NULL)
+    if (selmon->selected == NULL)
         return;
 
-    newtags = selmon->sel->tags ^ (arg->ui & TAGMASK);
+    newtags = selmon->selected->tags ^ (arg->ui & TAGMASK);
 
     if (newtags) {
-        selmon->sel->tags = newtags;
+        selmon->selected->tags = newtags;
         focus(NULL);
         arrange(selmon);
     }
 }
 
 void toggleview (const Arg *arg) {
-    unsigned int newtagset = selmon->tagset[selmon->seltags] ^ (arg->ui & TAGMASK);
+    unsigned int newtagset = selmon->tagset[selmon->selected_tags] ^ (arg->ui & TAGMASK);
 
     if (newtagset) {
         // update current tag if it was deselected
 
-        if (((1 << selmon->curtag) & newtagset) == false) {
+        if (((1 << selmon->current_tag) & newtagset) == false) {
             unsigned int i = 0;
             unsigned int mask = 1;
 
@@ -2247,10 +2276,10 @@ void toggleview (const Arg *arg) {
                 i++;
             }
 
-            selmon->curtag = i;
+            selmon->current_tag = i;
         }
 
-        selmon->tagset[selmon->seltags] = newtagset;
+        selmon->tagset[selmon->selected_tags] = newtagset;
         focus(NULL);
         arrange(selmon);
     }
@@ -2275,8 +2304,8 @@ void unmanage (Client *c, bool destroyed) {
 
     int i;
     for (i = 0; i < LENGTH(tags); i++) {
-        if (m->focus[i] == c)
-            m->focus[i] = NULL;
+        if (m->tagfocus[i] == c)
+            m->tagfocus[i] = NULL;
     }
 
     detach(c);
@@ -2330,48 +2359,52 @@ void updatebars (void) {
 
         loft_window_init(&m->bar->win, 0);
         loft_layout_init(&m->bar->lt_main, ASPECT_H, 0, 0);
-        loft_layout_init(&m->bar->lt_tags, ASPECT_H, 0, 0);
+        loft_layout_init(&m->bar->lt_tagstrip, ASPECT_H, 0, 0);
 
         loft_window_set_layout(&m->bar->win, &m->bar->lt_main);
 
         loft_label_init(&m->bar->lb_layout, 0, m->ltsymbol);
-        loft_label_init(&m->bar->lb_title, FLOW_L, m->sel != NULL ? m->sel->name : NULL);
+        loft_label_init(&m->bar->lb_title, FLOW_L, m->selected != NULL ? m->selected->name : NULL);
         loft_label_init(&m->bar->lb_status, FLOW_R, stext);
 
+        loft_button_init(&m->bar->dash_btn, dash_btn_text);
+        loft_button_set_activatable(&m->bar->dash_btn, true);
+
+        loft_signal_connect(&m->bar->dash_btn.base, "activate", _on_dash_btn_activate, NULL);
+        loft_signal_connect(&m->bar->dash_btn.base, "deactivate", _on_dash_btn_deactivate, NULL);
+
+        m->bar->win.base.draw_base = false;
         m->bar->lb_layout.base.draw_base = false;
         m->bar->lb_title.base.draw_base = false;
         m->bar->lb_status.base.draw_base = false;
+        m->bar->dash_btn.base.draw_base = false;
 
         loft_label_set_padding(&m->bar->lb_layout, 10,0,10,0);
         loft_label_set_padding(&m->bar->lb_title, 8,0,8,0);
         loft_label_set_padding(&m->bar->lb_status, 8,0,8,0);
 
-        loft_layout_attach(&m->bar->lt_main, &m->bar->lt_tags.base, EXPAND_Y);
+        loft_layout_attach(&m->bar->lt_main, &m->bar->lt_tagstrip.base, EXPAND_Y);
         loft_layout_attach(&m->bar->lt_main, &m->bar->lb_layout.base, EXPAND_Y);
         loft_layout_attach(&m->bar->lt_main, &m->bar->lb_title.base, EXPAND_X | EXPAND_Y);
         loft_layout_attach(&m->bar->lt_main, &m->bar->lb_status.base, EXPAND_Y);
+        loft_layout_attach(&m->bar->lt_main, &m->bar->dash_btn.base, EXPAND_Y);
 
-        m->lb_tags = malloc(sizeof(TagLabel) * LENGTH(tags));
+        m->bar->lb_tags = malloc(sizeof(TagLabel) * LENGTH(tags));
 
         for (i = 0; i < LENGTH(tags); i++) {
-            t = m->lb_tags + i;
-
-            // init base
+            t = m->bar->lb_tags + i;
 
             loft_widget_init(&t->base, "tag_label", 0);
             t->base.draw_base = false;
 
-            // init defaults
-
             t->num = i;
-
             t->current = false;
             t->unused = true;
             t->selected = false;
             t->has_sel = false;
             t->urgent = false;
 
-            // set tag colors
+            // set colors
 
             loft_rgba_set_from_str(&t->style.unused.bg, (char*) unused_tag_bg_color);
             loft_rgba_set_from_str(&t->style.unused.fg, (char*) unused_tag_fg_color);
@@ -2402,17 +2435,17 @@ void updatebars (void) {
 
             loft_widget_set_minimum_size(&t->base, ext.width + 16, f_ext.height);
 
-            // catch events
+            // listen for events
 
             loft_signal_connect(&t->base, "button-press", _on_tag_pressed, NULL);
             loft_signal_connect(&t->base, "draw", _draw_tag, NULL);
 
             // attach to layout
 
-            loft_layout_attach(&m->bar->lt_tags, &t->base, EXPAND_X | EXPAND_Y);
+            loft_layout_attach(&m->bar->lt_tagstrip, &t->base, EXPAND_X | EXPAND_Y);
         }
 
-        // set label colors
+        // set widget colors
 
         loft_rgba_set_from_str(&m->bar->lb_layout.style.normal.bg, (char*) ltsym_bg_color);
         loft_rgba_set_from_str(&m->bar->lb_layout.style.normal.fg, (char*) ltsym_fg_color);
@@ -2423,11 +2456,25 @@ void updatebars (void) {
         loft_rgba_set_from_str(&m->bar->lb_status.style.normal.bg, (char*) status_bg_color);
         loft_rgba_set_from_str(&m->bar->lb_status.style.normal.fg, (char*) status_fg_color);
 
+        loft_rgba_set_from_str(&m->bar->dash_btn.style.normal.bg, (char*) dash_btn_bg_color);
+        loft_rgba_set_from_str(&m->bar->dash_btn.style.normal.fg, (char*) dash_btn_fg_color);
+
+        loft_rgba_set_from_str(&m->bar->dash_btn.style.prelight.bg, (char*) dash_btn_prelight_bg_color);
+        loft_rgba_set_from_str(&m->bar->dash_btn.style.prelight.fg, (char*) dash_btn_prelight_fg_color);
+        loft_rgba_set_from_str(&m->bar->dash_btn.style.pressed.bg, (char*) dash_btn_prelight_bg_color);
+        loft_rgba_set_from_str(&m->bar->dash_btn.style.pressed.fg, (char*) dash_btn_prelight_fg_color);
+
+        loft_rgba_set_from_str(&m->bar->dash_btn.style.active.bg, (char*) dash_btn_active_bg_color);
+        loft_rgba_set_from_str(&m->bar->dash_btn.style.active.fg, (char*) dash_btn_active_fg_color);
+        loft_rgba_set_from_str(&m->bar->dash_btn.style.active_prelight.bg, (char*) dash_btn_active_bg_color);
+        loft_rgba_set_from_str(&m->bar->dash_btn.style.active_prelight.fg, (char*) dash_btn_active_fg_color);
+        loft_rgba_set_from_str(&m->bar->dash_btn.style.active_pressed.bg, (char*) dash_btn_active_bg_color);
+        loft_rgba_set_from_str(&m->bar->dash_btn.style.active_pressed.fg, (char*) dash_btn_active_fg_color);
+
         // override redirect, move, resize, lock size, show
 
         loft_widget_override_redirect(&m->bar->win.base, true);
-
-        loft_widget_move(&m->bar->win.base, m->mx, m->by);
+        loft_widget_move(&m->bar->win.base, m->mx, m->bar_y);
         loft_widget_resize(&m->bar->win.base, m->mw, bh);
         loft_widget_lock_size(&m->bar->win.base, true);
 
@@ -2465,10 +2512,10 @@ void updatebartags (Monitor* m) {
         cc = 0;
         mask = 1 << i;
 
-        t = m->lb_tags + i;
-        t->current = i == m->curtag;
-        t->has_sel = m->sel != NULL && mask & m->sel->tags;
-        t->selected = mask & m->tagset[m->seltags];
+        t = m->bar->lb_tags + i;
+        t->current = i == m->current_tag;
+        t->has_sel = m->selected != NULL && mask & m->selected->tags;
+        t->selected = mask & m->tagset[m->selected_tags];
         t->urgent = false;
 
         for (c = m->clients; c != NULL; c = c->next) {
@@ -2489,7 +2536,7 @@ void updatebartags (Monitor* m) {
 }
 
 inline void updatebartitle (Monitor* m) {
-    loft_label_set_text(&m->bar->lb_title, m->sel != NULL ? m->sel->name : NULL);
+    loft_label_set_text(&m->bar->lb_title, m->selected != NULL ? m->selected->name : NULL);
 }
 
 void updateborders (Monitor *m) {
@@ -2498,7 +2545,7 @@ void updateborders (Monitor *m) {
     int oldw;
     int oldh;
 
-    if (m->lts[m->curtag]->arrange == NULL) {
+    if (m->layouts[m->current_tag]->arrange == NULL) {
         for (c = nexttiled(m->clients); c; c = nexttiled(c->next)) {
             if (c->bw == 0) {
                 oldw = WIDTH(c);
@@ -2520,7 +2567,7 @@ void updateborders (Monitor *m) {
 
     int bdr;
 
-    if (m->lts[m->curtag]->arrange == &monocle || ntiled(m) == 1)
+    if (m->layouts[m->current_tag]->arrange == &monocle || ntiled(m) == 1)
         bdr = 0;
     else
         bdr = border_width;
@@ -2576,27 +2623,33 @@ bool updategeom (void) {
         nn = j;
 
         if (n <= nn) {
-            for(i = 0; i < (nn - n); i++) { /* new monitors available */
+            for (i = 0; i < (nn - n); i++) { /* new monitors available */
                 for(m = mons; m && m->next; m = m->next);
                 if (m)
                     m->next = createmon();
                 else
                     mons = createmon();
             }
-            for(i = 0, m = mons; i < nn && m; m = m->next, i++)
+            for (i = 0, m = mons; i < nn && m; m = m->next, i++)
                 if (i >= n || (unique[i].x_org != m->mx || unique[i].y_org != m->my || unique[i].width != m->mw || unique[i].height != m->mh)) {
                     dirty = true;
+
                     m->num = i;
                     m->mx = m->wx = unique[i].x_org;
                     m->my = m->wy = unique[i].y_org;
                     m->mw = m->ww = unique[i].width;
                     m->mh = m->wh = unique[i].height;
+
                     updatestruts(m);
+
+                    loft_widget_move(&m->dashboard.base, m->wx, m->wy);
+                    loft_widget_resize(&m->dashboard.base, m->ww, m->wh);
                 }
         }
         else { /* less monitors available nn < n */
-            for(i = nn; i < n; i++) {
+            for (i = nn; i < n; i++) {
                 for (m = mons; m && m->next; m = m->next);
+
                 while (m->clients) {
                     dirty = true;
                     c = m->clients;
@@ -2606,8 +2659,10 @@ bool updategeom (void) {
                     attach(c);
                     attachstack(c);
                 }
+
                 if (m == selmon)
                     selmon = mons;
+
                 cleanupmon(m);
             }
         }
@@ -2767,7 +2822,7 @@ void updatewmhints (Client *c) {
 
 
         if (urgent) {
-            if (c == selmon->sel) {
+            if (c == selmon->selected) {
                 wmh->flags &= ~XUrgencyHint;
                 XSetWMHints(dpy, c->win, wmh);
             }
@@ -2785,31 +2840,31 @@ void updatewmhints (Client *c) {
 }
 
 void view (const Arg *arg) {
-    if ((arg->ui & TAGMASK) == selmon->tagset[selmon->seltags])
+    if ((arg->ui & TAGMASK) == selmon->tagset[selmon->selected_tags])
         return;
 
-    selmon->seltags ^= 1;
+    selmon->selected_tags ^= 1;
 
     if (arg->ui & TAGMASK) {
-        selmon->tagset[selmon->seltags] = arg->ui & TAGMASK;
+        selmon->tagset[selmon->selected_tags] = arg->ui & TAGMASK;
 
-        selmon->prevtag = selmon->curtag;
-        selmon->curtag = arg->ui;
+        selmon->previous_tag = selmon->current_tag;
+        selmon->current_tag = arg->ui;
 
         if (arg->ui != -1) {
             int i;
             for (i = 0; (arg->ui & 1 << i) == 0; i++);
-            selmon->curtag = i;
+            selmon->current_tag = i;
         } else
-            selmon->curtag = 0;
+            selmon->current_tag = 0;
     }
     else {
-        int oldcur = selmon->curtag;
-        selmon->curtag = selmon->prevtag;
-        selmon->prevtag = oldcur;
+        int oldcur = selmon->current_tag;
+        selmon->current_tag = selmon->previous_tag;
+        selmon->previous_tag = oldcur;
     }
 
-    focus(selmon->focus[selmon->curtag]);
+    focus(selmon->tagfocus[selmon->current_tag]);
     arrange(selmon);
 }
 
@@ -2869,9 +2924,9 @@ int xerrorstart (Display *dpy, XErrorEvent *ee) {
 }
 
 void zoom (const Arg *arg) {
-    Client *c = selmon->sel;
+    Client *c = selmon->selected;
 
-    if (selmon->lts[selmon->curtag]->arrange == NULL || (selmon->sel && selmon->sel->isfloating))
+    if (selmon->layouts[selmon->current_tag]->arrange == NULL || (selmon->selected && selmon->selected->isfloating))
         return;
 
     if (c == nexttiled(selmon->clients))
