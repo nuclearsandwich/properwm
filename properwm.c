@@ -166,36 +166,38 @@ void pushdown (const Arg *arg);
 void pushup (const Arg *arg);
 void quit (const Arg *arg);
 Monitor* recttomon (int x, int y, int w, int h);
-void resetnmaster (const Arg *arg);
-void resize (Client *c, int x, int y, int w, int h, bool interact);
-void resizeclient (Client *c, int x, int y, int w, int h);
-void resizemouse (const Arg *arg);
-void restack (Monitor *m);
+void resetnmaster (const Arg* arg);
+void resize (Client* c, int x, int y, int w, int h, bool interact);
+void resizeclient (Client* c, int x, int y, int w, int h);
+void resizemouse (const Arg* arg);
+void restack (Monitor* m);
 void run (void);
 void scan (void);
-bool sendevent (Client *c, Atom proto);
-void sendmon (Client *c, Monitor *m);
-void setclientstate (Client *c, long state);
-void setfocus (Client *c);
-void setfullscreen (Client *c, bool fullscreen);
-void setlayout (const Arg *arg);
-void setmfact (const Arg *arg);
-bool setstrut (Monitor *m, int pos, int px);
+bool sendevent (Client* c, Atom proto);
+void sendmon (Client* c, Monitor *m);
+void setclientstate (Client* c, long state);
+void setdashboard (Monitor* m, bool visible);
+void setfocus (Client* c);
+void setfullscreen (Client* c, bool fullscreen);
+void setlayout (const Arg* arg);
+void setmfact (const Arg* arg);
+bool setstrut (Monitor* m, int pos, int px);
 void setup (void);
-void showhide (Client *c);
+void showhide (Client* c);
 void sigchld (int unused);
-void spawn (const Arg *arg);
-void stack (Monitor *m );
-void tag (const Arg *arg);
-void tagmon (const Arg *arg);
-void tile (Monitor *m);
-void togglebar (const Arg *arg);
-void togglebarpos (const Arg *arg);
-void togglefloating (const Arg *arg);
-void toggletag (const Arg *arg);
-void toggleview (const Arg *arg);
-void unfocus (Client *c, bool setfocus);
-void unmanage (Client *c, bool destroyed);
+void spawn (const Arg* arg);
+void stack (Monitor* m);
+void tag (const Arg* arg);
+void tagmon (const Arg* arg);
+void tile (Monitor* m);
+void togglebar (const Arg* arg);
+void togglebarpos (const Arg* arg);
+void toggledashboard (const Arg* arg);
+void togglefloating (const Arg* arg);
+void toggletag (const Arg* arg);
+void toggleview (const Arg* arg);
+void unfocus (Client* c, bool setfocus);
+void unmanage (Client* c, bool destroyed);
 void unmapnotify (XEvent *e);
 bool updategeom (void);
 void updatebars (void);
@@ -203,7 +205,7 @@ void updatebarlayout (Monitor* m);
 void updatebarstatus (Monitor* m);
 void updatebartags (Monitor* m);
 void updatebartitle (Monitor* m);
-void updateborders (Monitor *m);
+void updateborders (Monitor* m);
 void updateclientlist (void);
 void updatenumlockmask (void);
 void updatesizehints (Client *c);
@@ -296,6 +298,12 @@ typedef struct Bar {
     LoftButton dash_btn;
 } Bar;
 
+typedef struct Dashboard {
+    LoftWindow win;
+    LoftLayout lt;
+    LoftLabel userinfo;
+} Dashboard;
+
 struct Monitor {
     int num;
 
@@ -318,7 +326,7 @@ struct Monitor {
     int bar_y;
     bool show_bar;
 
-    LoftWindow dashboard;
+    Dashboard dashboard;
 
     Client* tagfocus[LENGTH(tags)];
     float mfacts[LENGTH(tags)];
@@ -436,19 +444,11 @@ void _draw_tag (TagLabel* t) {
     cairo_destroy(cr);
 }
 
-void _on_dash_btn_activate (LoftButton* dash_btn) {
-    loft_widget_show(&selmon->dashboard.base);
-    XRaiseWindow(loftenv.display, selmon->dashboard.base.xwin);
-    XSetInputFocus(dpy, selmon->dashboard.base.xwin, RevertToPointerRoot, CurrentTime);
-}
-
-void _on_dash_btn_deactivate (LoftButton* dash_btn) {
-    loft_widget_hide(&selmon->dashboard.base);
-    focus(selmon->tagfocus[selmon->current_tag]);
+void _on_dash_btn_click (LoftButton* dash_btn) {
+    toggledashboard(NULL);
 }
 
 // - - - - - - - - - - -
-
 
 void applyrules (Client *c) {
     const char *class, *instance;
@@ -847,8 +847,29 @@ Monitor* createmon (void) {
     m->bar_y = 0;
     m->show_bar = show_bar;
 
-    loft_window_init(&m->dashboard, 5);
-    loft_widget_override_redirect(&m->dashboard.base, true);
+    char* user = getenv("USER");
+
+    if (user == NULL)
+        user = "nobody";
+
+    char* hostname = malloc(56);
+    gethostname(hostname, 55);
+
+    char* userinfo = malloc(112);
+    sprintf(userinfo, "%s@%s", user, hostname);
+
+    free(hostname);
+
+    loft_window_init(&m->dashboard.win, 5);
+    loft_layout_init(&m->dashboard.lt, ASPECT_V, 0, 5);
+
+    loft_widget_override_redirect(&m->dashboard.win.base, true);
+    loft_window_set_layout(&m->dashboard.win, &m->dashboard.lt);
+
+    loft_label_init(&m->dashboard.userinfo, 0, userinfo);
+    loft_layout_attach(&m->dashboard.lt, &m->dashboard.userinfo.base, 0);
+
+    loft_widget_show_all(&m->dashboard.lt.base);
 
     for (i = 0; i < LENGTH(tags); i++) {
         m->tagfocus[i] = NULL;
@@ -963,7 +984,7 @@ void focus (Client *c) {
         attachstack(c);
         XSetWindowBorder(dpy, c->win, border_selected);
 
-        if (c->mon->dashboard.base.visible == false) {
+        if (c->mon->dashboard.win.base.visible == false) {
             grabbuttons(c, true);
             setfocus(c);
         }
@@ -1259,7 +1280,7 @@ void manage (Window w, XWindowAttributes *wa) {
 
     if (c->isfloating) {
         XRaiseWindow(dpy, c->win);
-        XRaiseWindow(dpy, c->mon->dashboard.base.xwin);
+        XRaiseWindow(dpy, c->mon->dashboard.win.base.xwin);
     }
 
     attach(c);
@@ -1273,6 +1294,7 @@ void manage (Window w, XWindowAttributes *wa) {
 
     if (c->mon == selmon)
         unfocus(selmon->selected, false);
+
     c->mon->selected = c;
 
     arrange(c->mon);
@@ -1658,7 +1680,7 @@ void restack (Monitor *m) {
     if (m->selected == NULL)
         return;
 
-    if (m->dashboard.base.visible == false && (m->selected->isfloating || m->layouts[m->current_tag]->arrange == NULL))
+    if (m->dashboard.win.base.visible == false && (m->selected->isfloating || m->layouts[m->current_tag]->arrange == NULL))
         XRaiseWindow(dpy, m->selected->win);
 
     if (m->layouts[m->current_tag]->arrange) {
@@ -1733,6 +1755,22 @@ void setclientstate (Client *c, long state) {
 
     XChangeProperty(dpy, c->win, wmatom[WMState], wmatom[WMState], 32,
             PropModeReplace, (unsigned char *)data, 2);
+}
+
+void setdashboard (Monitor* m, bool visible) {
+    if (visible && m->dashboard.win.base.visible)
+        return;
+
+    if (visible) {
+        loft_widget_show(&m->dashboard.win.base);
+        XRaiseWindow(loftenv.display, m->dashboard.win.base.xwin);
+        XSetInputFocus(dpy, m->dashboard.win.base.xwin, RevertToPointerRoot, CurrentTime);
+        loft_button_set_activated(&m->bar->dash_btn, true);
+    } else {
+        loft_widget_hide(&m->dashboard.win.base);
+        focus(selmon->tagfocus[m->current_tag]);
+        loft_button_set_activated(&m->bar->dash_btn, false);
+    }
 }
 
 bool sendevent (Client *c, Atom proto) {
@@ -1867,8 +1905,8 @@ void setup (void) {
     sigchld(0);
 
     /* init screen */
-    screen = DefaultScreen(dpy);
-    root = RootWindow(dpy, screen);
+    screen = loftenv.screen;
+    root = loftenv.root;
 
     sw = DisplayWidth(dpy, screen);
     sh = DisplayHeight(dpy, screen);
@@ -2191,7 +2229,7 @@ void togglebar (const Arg *arg) {
     arrange(selmon);
 }
 
-void togglebarpos (const Arg *arg) {
+void togglebarpos (const Arg* arg) {
     if (selmon->show_bar == false)
         return;
 
@@ -2215,7 +2253,11 @@ void togglebarpos (const Arg *arg) {
     updatebartags(selmon);
 }
 
-void togglefloating (const Arg *arg) {
+void toggledashboard (const Arg* arg) {
+    setdashboard(selmon, selmon->dashboard.win.base.visible == false);
+}
+
+void togglefloating (const Arg* arg) {
     if (selmon->selected == NULL)
         return;
 
@@ -2370,8 +2412,7 @@ void updatebars (void) {
         loft_button_init(&m->bar->dash_btn, dash_btn_text);
         loft_button_set_activatable(&m->bar->dash_btn, true);
 
-        loft_signal_connect(&m->bar->dash_btn.base, "activate", _on_dash_btn_activate, NULL);
-        loft_signal_connect(&m->bar->dash_btn.base, "deactivate", _on_dash_btn_deactivate, NULL);
+        loft_signal_connect(&m->bar->dash_btn.base, "click", _on_dash_btn_click, NULL);
 
         m->bar->win.base.draw_base = false;
         m->bar->lb_layout.base.draw_base = false;
@@ -2630,6 +2671,9 @@ bool updategeom (void) {
                 else
                     mons = createmon();
             }
+
+            int dw;
+
             for (i = 0, m = mons; i < nn && m; m = m->next, i++)
                 if (i >= n || (unique[i].x_org != m->mx || unique[i].y_org != m->my || unique[i].width != m->mw || unique[i].height != m->mh)) {
                     dirty = true;
@@ -2642,8 +2686,10 @@ bool updategeom (void) {
 
                     updatestruts(m);
 
-                    loft_widget_move(&m->dashboard.base, m->wx, m->wy);
-                    loft_widget_resize(&m->dashboard.base, m->ww, m->wh);
+                    dw = m->ww / 4;
+
+                    loft_widget_move(&m->dashboard.win.base, m->ww - dw, m->wy);
+                    loft_widget_resize(&m->dashboard.win.base, dw, m->wh);
                 }
         }
         else { /* less monitors available nn < n */
@@ -2938,14 +2984,13 @@ void zoom (const Arg *arg) {
 
 int main (int argc, char *argv[]) {
     loft_init();
-
-    loftenv.font = (char*) font_name;
-    loftenv.font_size = (int) font_size;
-
     dpy = loftenv.display; 
 
     if (dpy == NULL)
         die("properwm: cannot open display");
+
+    loftenv.font = (char*) font_name;
+    loftenv.font_size = (int) font_size;
 
     if (argc == 2 && !strcmp("-v", argv[1]))
         die("ProperWM "VERSION", 2012 speeddefrost, 2006-2012 dwm authors -- see LICENSE for details\n");
