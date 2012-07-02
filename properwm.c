@@ -469,7 +469,7 @@ void _draw_dash_btn (DashboardButton* dash_btn) {
         double ind_x_center = dash_btn->base.width / 2;
         double ind_x_right = dash_btn->base.width - ind_x_left;
 
-        double ypx = dash_btn->base.height / 3;
+        double ypx = dash_btn->base.height / 2.8;
         double ind_y_base = selmon->bar_pos == TOP ? ypx : dash_btn->base.height - ypx;
         double ind_y_point = selmon->bar_pos == TOP ? dash_btn->base.height - ypx : ypx;
 
@@ -489,7 +489,7 @@ void _draw_dash_btn (DashboardButton* dash_btn) {
         double ind_y_center = dash_btn->base.height / 2;
         double ind_y_bottom = dash_btn->base.height - ind_y_top;
 
-        double ind_x_base = dash_btn->base.width / 3;
+        double ind_x_base = dash_btn->base.width / 2.8;
         double ind_x_point = dash_btn->base.width - ind_x_base;
 
         cairo_move_to(cr, ind_x_base, ind_y_top);
@@ -2309,9 +2309,21 @@ void togglebarpos (const Arg* arg) {
     else
         selmon->bar_y = selmon->my + (selmon->mh - bh);
 
-    loft_widget_move(&selmon->bar->win.base, selmon->mx, selmon->bar_y);
-    arrange(selmon);
+    // move bar window
 
+    loft_widget_move(&selmon->bar->win.base, selmon->mx, selmon->bar_y);
+
+    // update dashboard position
+
+    int dw = selmon->ww / 4;
+    loft_widget_move(&selmon->dashboard.win.base, selmon->ww - dw, selmon->wy);
+
+    // redraw dash_btn if active (to invert arrow)
+
+    if (selmon->bar->dash_btn.active)
+        loft_widget_draw(&selmon->bar->dash_btn.base);
+
+    arrange(selmon);
     updatebartags(selmon);
 }
 
