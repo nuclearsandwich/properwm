@@ -42,14 +42,6 @@ static const char title_fg_color[] = "#BFBFBF";
 static const char status_bg_color[] = "#222222CC";
 static const char status_fg_color[] = "#BFBFBF";
 
-static const char dash_btn_bg_color[] = "#000000CC";
-static const char dash_btn_fg_color[] = "#444444";
-
-static const char dash_btn_active_bg_color[] = "#000000CC";
-static const char dash_btn_active_fg_color[] = "#628AB3";
-
-static const char dashboard_bg[] = "#000000CC";
-
 //
 // GENERAL SETTINGS
 //
@@ -65,6 +57,7 @@ static unsigned int snap = 8;           // window snap threshold
 
 static bool click_to_focus = true;      // require click to focus windows with mouse, otherwise automatic
 static bool client_indicator = true;    // draw indicator showing which tag(s) selected client is on
+static bool monocle_padding = false;    // use padding in monocle layout
 static bool smart_borders = true;       // enable borders only when necessary
 static bool show_bar = true;            // bar visibility
 static int  bar_pos = TOP;              // bar position, TOP or BOTTOM
@@ -96,10 +89,10 @@ static Rule rules[] = {
 
 static Layout layouts[] = {
     /* symbol     arrange function */
-    { "ST", stack },
-    { "TI", tile },
-    { "MO", monocle },
-    { "FL", NULL },
+    { "S", stack },
+    { "T", tile },
+    { "M", monocle },
+    { "F", NULL },
 };
 
 //
@@ -138,7 +131,6 @@ static char* browsercmd[] = { "chromium", NULL };
 
 static Key keys[] = {
     /* modifier                     key             function           argument */
-    { MODKEY,                       XK_o,           toggledashboard,   {0} },
     { MODKEY,                       XK_p,           spawn,             {.v = dmenucmd } },
     { MODKEY|ShiftMask,             XK_Return,      spawn,             {.v = termcmd } },
     { MODKEY|ShiftMask,             XK_b,           spawn,             {.v = browsercmd } },

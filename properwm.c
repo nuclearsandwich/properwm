@@ -4,9 +4,7 @@
 #include <loft.h>
 
 #include <pthread.h>
-
 #include <pango/pangocairo.h>
-
 #include <signal.h>
 
 #include <stdarg.h>
@@ -16,8 +14,8 @@
 
 #undef __USE_BSD
 
-#include <string.h>
 #include <strext.h>
+#include <string.h>
 
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -176,7 +174,6 @@ void scan (void);
 bool sendevent (Client* c, Atom proto);
 void sendmon (Client* c, Monitor *m);
 void setclientstate (Client* c, long state);
-void setdashboard (Monitor* m, bool visible);
 void setfocus (Client* c);
 void setfullscreen (Client* c, bool fullscreen);
 void setlayout (const Arg* arg);
@@ -192,14 +189,12 @@ void tagmon (const Arg* arg);
 void tile (Monitor* m);
 void togglebar (const Arg* arg);
 void togglebarpos (const Arg* arg);
-void toggledashboard (const Arg* arg);
 void togglefloating (const Arg* arg);
 void toggletag (const Arg* arg);
 void toggleview (const Arg* arg);
 void unfocus (Client* c, bool setfocus);
 void unmanage (Client* c, bool destroyed);
 void unmapnotify (XEvent *e);
-bool updategeom (void);
 void updatebars (void);
 void updatebarlayout (Monitor* m);
 void updatebarstatus (Monitor* m);
@@ -207,6 +202,7 @@ void updatebartags (Monitor* m);
 void updatebartitle (Monitor* m);
 void updateborders (Monitor* m);
 void updateclientlist (void);
+bool updategeom (void);
 void updatenumlockmask (void);
 void updatesizehints (Client *c);
 void updatestatus (void);
@@ -229,11 +225,15 @@ unsigned long border_urgent;
 
 const char broken[] = "broken";
 char stext[256];
+
 int screen;
-int sw, sh;           /* X display screen geometry width, height */
-int bh = 0;           /* bar geometry */
-int (*xerrorxlib)(Display *, XErrorEvent *);
+int sw, sh; // screen geometry
+int bh = 0; // bar height
+
 unsigned int numlockmask = 0;
+
+int (*xerrorxlib)(Display *, XErrorEvent *);
+
 void (*handler[LASTEvent]) (XEvent *) = {
     [ButtonPress] = buttonpress,
     [ClientMessage] = clientmessage,
@@ -249,6 +249,7 @@ void (*handler[LASTEvent]) (XEvent *) = {
     [PropertyNotify] = propertynotify,
     [UnmapNotify] = unmapnotify
 };
+
 Atom wmatom[WMLast], netatom[NetLast];
 bool running = true;
 Cursor cursor[CurLast];
@@ -285,16 +286,6 @@ typedef struct TagLabel {
     bool urgent;
 } TagLabel;
 
-typedef struct DashboardButton {
-    LoftWidget base;
-    bool active;
-
-    struct {
-        LoftRGBAPair normal;
-        LoftRGBAPair active;
-    } style;
-} DashboardButton;
-
 typedef struct Bar {
     LoftWindow win;
     LoftLayout lt_main;
@@ -305,15 +296,7 @@ typedef struct Bar {
     LoftLabel lb_layout;
     LoftLabel lb_title;
     LoftLabel lb_status;
-
-    DashboardButton dash_btn;
 } Bar;
-
-typedef struct Dashboard {
-    LoftWindow win;
-    LoftLayout lt;
-    LoftLabel userinfo;
-} Dashboard;
 
 struct Monitor {
     int num;
@@ -336,8 +319,6 @@ struct Monitor {
     bool bar_pos;
     int bar_y;
     bool show_bar;
-
-    Dashboard dashboard;
 
     Client* tagfocus[LENGTH(tags)];
     float mfacts[LENGTH(tags)];
@@ -452,58 +433,6 @@ void _draw_tag (TagLabel* t) {
 
     cairo_restore(cr);
     cairo_destroy(cr);
-}
-
-void _draw_dash_btn (DashboardButton* dash_btn) {
-    cairo_t* cr = cairo_create(dash_btn->base.cs);
-    cairo_save(cr);
-
-    if (dash_btn->active) {
-        loft_cairo_set_rgba(cr, &dash_btn->style.active.bg);
-        cairo_rectangle(cr, 0, 0, dash_btn->base.width, dash_btn->base.height);
-        cairo_fill(cr);
-
-        loft_cairo_set_rgba(cr, &dash_btn->style.active.fg);
-
-        double ind_x_left = dash_btn->base.width / 3;
-        double ind_x_center = dash_btn->base.width / 2;
-        double ind_x_right = dash_btn->base.width - ind_x_left;
-
-        double ypx = dash_btn->base.height / 2.8;
-        double ind_y_base = selmon->bar_pos == TOP ? ypx : dash_btn->base.height - ypx;
-        double ind_y_point = selmon->bar_pos == TOP ? dash_btn->base.height - ypx : ypx;
-
-        cairo_move_to(cr, ind_x_left, ind_y_base);
-        cairo_line_to(cr, ind_x_right, ind_y_base);
-        cairo_line_to(cr, ind_x_center, ind_y_point);
-
-        cairo_fill(cr);
-    } else {
-        loft_cairo_set_rgba(cr, &dash_btn->style.normal.bg);
-        cairo_rectangle(cr, 0, 0, dash_btn->base.width, dash_btn->base.height);
-        cairo_fill(cr);
-
-        loft_cairo_set_rgba(cr, &dash_btn->style.normal.fg);
-
-        double ind_y_top = dash_btn->base.height / 3;
-        double ind_y_center = dash_btn->base.height / 2;
-        double ind_y_bottom = dash_btn->base.height - ind_y_top;
-
-        double ind_x_base = dash_btn->base.width / 2.8;
-        double ind_x_point = dash_btn->base.width - ind_x_base;
-
-        cairo_move_to(cr, ind_x_base, ind_y_top);
-        cairo_line_to(cr, ind_x_point, ind_y_center);
-        cairo_line_to(cr, ind_x_base, ind_y_bottom);
-    }
-
-    cairo_fill(cr);
-    cairo_restore(cr);
-    cairo_destroy(cr);
-}
-
-void _on_dash_btn_click (LoftButton* dash_btn) {
-    toggledashboard(NULL);
 }
 
 // - - - - - - - - - - -
@@ -905,32 +834,6 @@ Monitor* createmon (void) {
     m->bar_y = 0;
     m->show_bar = show_bar;
 
-    char* user = getenv("USER");
-
-    if (user == NULL)
-        user = "nobody";
-
-    char* hostname = malloc(56);
-    gethostname(hostname, 55);
-
-    char* userinfo = malloc(112);
-    sprintf(userinfo, "%s@%s", user, hostname);
-
-    free(hostname);
-
-    loft_window_init(&m->dashboard.win, 5);
-    loft_layout_init(&m->dashboard.lt, ASPECT_V, 0, 5);
-
-    loft_rgba_set_from_str(&m->dashboard.win.base.style.base, (char*) dashboard_bg);
-
-    loft_widget_override_redirect(&m->dashboard.win.base, true);
-    loft_window_set_layout(&m->dashboard.win, &m->dashboard.lt);
-
-    loft_label_init(&m->dashboard.userinfo, 0, userinfo);
-    loft_layout_attach(&m->dashboard.lt, &m->dashboard.userinfo.base, 0);
-
-    loft_widget_show_all(&m->dashboard.lt.base);
-
     for (i = 0; i < LENGTH(tags); i++) {
         m->tagfocus[i] = NULL;
         m->layouts[i] = &layouts[0];
@@ -1042,12 +945,11 @@ void focus (Client *c) {
 
         detachstack(c);
         attachstack(c);
+
         XSetWindowBorder(dpy, c->win, border_selected);
 
-        if (c->mon->dashboard.win.base.visible == false) {
-            grabbuttons(c, true);
-            setfocus(c);
-        }
+        grabbuttons(c, true);
+        setfocus(c);
     } else {
         XSetInputFocus(dpy, root, RevertToPointerRoot, CurrentTime);
         XDeleteProperty(dpy, root, netatom[NetActiveWindow]);
@@ -1241,8 +1143,6 @@ void iteration (void) {
     XEvent ev;
     XNextEvent(dpy, &ev);
 
-    // always check if loft wants the event first
-
     loft_process_event(&ev);
 
     if (handler[ev.type])
@@ -1338,10 +1238,8 @@ void manage (Window w, XWindowAttributes *wa) {
     XSelectInput(dpy, w, EnterWindowMask|FocusChangeMask|PropertyChangeMask|StructureNotifyMask);
     grabbuttons(c, false);
 
-    if (c->isfloating) {
+    if (c->isfloating)
         XRaiseWindow(dpy, c->win);
-        XRaiseWindow(dpy, c->mon->dashboard.win.base.xwin);
-    }
 
     attach(c);
     attachstack(c);
@@ -1387,17 +1285,30 @@ monocle(Monitor *m) {
     unsigned int n = 0;
     Client *c;
 
-    for (c = m->clients; c; c = c->next)
+    for (c = m->clients; c; c = c->next) {
         if (ISVISIBLE(c))
             n++;
+    }
 
-    if (n > 0) // override layout symbol
+    if (n > 0)
         snprintf(m->ltsymbol, sizeof(m->ltsymbol), "%d", n);
 
     updatebarlayout(m);
 
+    int x = m->wx;
+    int y = m->wy;
+    int w = m->ww - (2 * border_width);
+    int h = m->wh - (2 * border_width);
+
+    if (monocle_padding) {
+        x += padding;
+        y += padding;
+        w -= (2 * padding);
+        h -= (2 * padding);
+    }
+
     for (c = nexttiled(m->clients); c; c = nexttiled(c->next))
-        resize(c, m->wx + padding, m->wy + padding, m->ww - (2*c->bw) - (2*padding), m->wh - (2*c->bw) - (2*padding), false);
+        resize(c, x,y, w,h, false);
 }
 
 void motionnotify (XEvent *e) {
@@ -1740,10 +1651,10 @@ void restack (Monitor *m) {
     if (m->selected == NULL)
         return;
 
-    if (m->dashboard.win.base.visible == false && (m->selected->isfloating || m->layouts[m->current_tag]->arrange == NULL))
+    if (m->selected->isfloating || m->layouts[m->current_tag]->arrange == NULL)
         XRaiseWindow(dpy, m->selected->win);
 
-    if (m->layouts[m->current_tag]->arrange) {
+    if (m->layouts[m->current_tag]->arrange != NULL) {
         wc.stack_mode = Below;
         wc.sibling = m->bar->win.base.xwin;
 
@@ -1817,24 +1728,6 @@ void setclientstate (Client *c, long state) {
             PropModeReplace, (unsigned char *)data, 2);
 }
 
-void setdashboard (Monitor* m, bool visible) {
-    if (visible && m->dashboard.win.base.visible)
-        return;
-
-    if (visible) {
-        loft_widget_show(&m->dashboard.win.base);
-        XRaiseWindow(loftenv.display, m->dashboard.win.base.xwin);
-        XSetInputFocus(dpy, m->dashboard.win.base.xwin, RevertToPointerRoot, CurrentTime);
-        m->bar->dash_btn.active = true;
-    } else {
-        loft_widget_hide(&m->dashboard.win.base);
-        focus(selmon->tagfocus[m->current_tag]);
-        m->bar->dash_btn.active = false;
-    }
-
-    REDRAW_IF_VISIBLE(&m->bar->dash_btn.base);
-}
-
 bool sendevent (Client *c, Atom proto) {
     int n;
     Atom *protocols;
@@ -1906,16 +1799,19 @@ void setlayout (const Arg *arg) {
         return;
 
     if (arg && arg->v)
-        selmon->layouts[selmon->current_tag] = (Layout *)arg->v;
+        selmon->layouts[selmon->current_tag] = (Layout*) arg->v;
 
-    strncpy(selmon->ltsymbol, selmon->layouts[selmon->current_tag]->symbol, sizeof(selmon->ltsymbol));
+    const char* ltsym = selmon->layouts[selmon->current_tag]->symbol;
+
+    if (ltsym != NULL)
+        strncpy(selmon->ltsymbol, ltsym, 15);
+
     updatebarlayout(selmon);
 
-    if (selmon->selected)
+    if (selmon->selected != NULL)
         arrange(selmon);
 }
 
-/* arg > 1.0 will set mfact absolutly */
 void setmfact (const Arg *arg) {
     float f;
 
@@ -1977,6 +1873,7 @@ void setup (void) {
     updategeom();
 
     /* init atoms */
+
     wmatom[WMProtocols] = XInternAtom(dpy, "WM_PROTOCOLS", false);
     wmatom[WMDelete] = XInternAtom(dpy, "WM_DELETE_WINDOW", false);
     wmatom[WMState] = XInternAtom(dpy, "WM_STATE", false);
@@ -1992,11 +1889,13 @@ void setup (void) {
     netatom[NetClientList] = XInternAtom(dpy, "_NET_CLIENT_LIST", false);
 
     /* init cursors */
+
     cursor[CurNormal] = XCreateFontCursor(dpy, XC_left_ptr);
     cursor[CurResize] = XCreateFontCursor(dpy, XC_sizing);
     cursor[CurMove] = XCreateFontCursor(dpy, XC_fleur);
 
     /* init bars */
+
     updatebars();
     updatestatus();
 
@@ -2029,6 +1928,7 @@ void showhide (Client *c) {
         return;
 
     /* show clients top down */
+
     if (ISVISIBLE(c)) {
         XMoveWindow(dpy, c->win, c->x, c->y);
         if ((c->mon->layouts[c->mon->current_tag]->arrange == NULL || c->isfloating) && c->isfullscreen == false)
@@ -2037,6 +1937,7 @@ void showhide (Client *c) {
     }
     
     /* hide clients bottom up */
+
     else {
         showhide(c->snext);
         XMoveWindow(dpy, c->win, WIDTH(c) * -2, c->y);
@@ -2309,26 +2210,10 @@ void togglebarpos (const Arg* arg) {
     else
         selmon->bar_y = selmon->my + (selmon->mh - bh);
 
-    // move bar window
-
     loft_widget_move(&selmon->bar->win.base, selmon->mx, selmon->bar_y);
-
-    // update dashboard position
-
-    int dw = selmon->ww / 4;
-    loft_widget_move(&selmon->dashboard.win.base, selmon->ww - dw, selmon->wy);
-
-    // redraw dash_btn if active (to invert arrow)
-
-    if (selmon->bar->dash_btn.active)
-        loft_widget_draw(&selmon->bar->dash_btn.base);
 
     arrange(selmon);
     updatebartags(selmon);
-}
-
-void toggledashboard (const Arg* arg) {
-    setdashboard(selmon, selmon->dashboard.win.base.visible == false);
 }
 
 void togglefloating (const Arg* arg) {
@@ -2483,20 +2368,10 @@ void updatebars (void) {
         loft_label_init(&m->bar->lb_title, FLOW_L, m->selected != NULL ? m->selected->name : NULL);
         loft_label_init(&m->bar->lb_status, FLOW_R, stext);
 
-        loft_widget_init(&m->bar->dash_btn.base, "dashboard_button", 0);
-        m->bar->dash_btn.active = false;
-
-        // keep arrow consistent by using bar height as minimum size
-        loft_widget_set_minimum_size(&m->bar->dash_btn.base, bh, bh);
-
-        loft_signal_connect(&m->bar->dash_btn.base, "button-press", _on_dash_btn_click, NULL);
-        loft_signal_connect(&m->bar->dash_btn.base, "draw", _draw_dash_btn, NULL);
-
         m->bar->win.base.draw_base = false;
         m->bar->lb_layout.base.draw_base = false;
         m->bar->lb_title.base.draw_base = false;
         m->bar->lb_status.base.draw_base = false;
-        m->bar->dash_btn.base.draw_base = false;
 
         loft_label_set_padding(&m->bar->lb_layout, 10,0,10,0);
         loft_label_set_padding(&m->bar->lb_title, 8,0,8,0);
@@ -2506,7 +2381,6 @@ void updatebars (void) {
         loft_layout_attach(&m->bar->lt_main, &m->bar->lb_layout.base, EXPAND_Y);
         loft_layout_attach(&m->bar->lt_main, &m->bar->lb_title.base, EXPAND_X | EXPAND_Y);
         loft_layout_attach(&m->bar->lt_main, &m->bar->lb_status.base, EXPAND_Y);
-        loft_layout_attach(&m->bar->lt_main, &m->bar->dash_btn.base, EXPAND_Y);
 
         m->bar->lb_tags = malloc(sizeof(TagLabel) * LENGTH(tags));
 
@@ -2574,12 +2448,6 @@ void updatebars (void) {
 
         loft_rgba_set_from_str(&m->bar->lb_status.style.normal.bg, (char*) status_bg_color);
         loft_rgba_set_from_str(&m->bar->lb_status.style.normal.fg, (char*) status_fg_color);
-
-        loft_rgba_set_from_str(&m->bar->dash_btn.style.normal.bg, (char*) dash_btn_bg_color);
-        loft_rgba_set_from_str(&m->bar->dash_btn.style.normal.fg, (char*) dash_btn_fg_color);
-
-        loft_rgba_set_from_str(&m->bar->dash_btn.style.active.bg, (char*) dash_btn_active_bg_color);
-        loft_rgba_set_from_str(&m->bar->dash_btn.style.active.fg, (char*) dash_btn_active_fg_color);
 
         // override redirect, move, resize, lock size, show
 
@@ -2741,8 +2609,6 @@ bool updategeom (void) {
                     mons = createmon();
             }
 
-            int dw;
-
             for (i = 0, m = mons; i < nn && m; m = m->next, i++)
                 if (i >= n || (unique[i].x_org != m->mx || unique[i].y_org != m->my || unique[i].width != m->mw || unique[i].height != m->mh)) {
                     dirty = true;
@@ -2754,11 +2620,6 @@ bool updategeom (void) {
                     m->mh = m->wh = unique[i].height;
 
                     updatestruts(m);
-
-                    dw = m->ww / 4;
-
-                    loft_widget_move(&m->dashboard.win.base, m->ww - dw, m->wy);
-                    loft_widget_resize(&m->dashboard.win.base, dw, m->wh);
                 }
         }
         else { /* less monitors available nn < n */
@@ -2797,10 +2658,12 @@ bool updategeom (void) {
             updatestruts(mons);
         }
     }
+
     if (dirty) {
         selmon = mons;
         selmon = wintomon(root);
     }
+
     return dirty;
 }
 
