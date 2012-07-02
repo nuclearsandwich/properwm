@@ -43,13 +43,12 @@ static const char status_bg_color[] = "#222222CC";
 static const char status_fg_color[] = "#BFBFBF";
 
 static const char dash_btn_bg_color[] = "#000000CC";
-static const char dash_btn_fg_color[] = "#808080";
+static const char dash_btn_fg_color[] = "#444444";
 
-static const char dash_btn_prelight_bg_color[] = "#000000CC";
-static const char dash_btn_prelight_fg_color[] = "#808080";
+static const char dash_btn_active_bg_color[] = "#000000CC";
+static const char dash_btn_active_fg_color[] = "#628AB3";
 
-static const char dash_btn_active_bg_color[] = "#BFBFBFCC";
-static const char dash_btn_active_fg_color[] = "#000000";
+static const char dashboard_bg[] = "#000000CC";
 
 //
 // GENERAL SETTINGS
@@ -59,8 +58,6 @@ enum {
     TOP,
     BOTTOM
 };
-
-static char dash_btn_text[] = "+";      // dashboard button text
 
 static unsigned int border_width = 1;   // window border width
 static unsigned int padding = 8;        // amount of padding between tiled windows

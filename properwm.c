@@ -285,6 +285,16 @@ typedef struct TagLabel {
     bool urgent;
 } TagLabel;
 
+typedef struct DashboardButton {
+    LoftWidget base;
+    bool active;
+
+    struct {
+        LoftRGBAPair normal;
+        LoftRGBAPair active;
+    } style;
+} DashboardButton;
+
 typedef struct Bar {
     LoftWindow win;
     LoftLayout lt_main;
@@ -295,7 +305,8 @@ typedef struct Bar {
     LoftLabel lb_layout;
     LoftLabel lb_title;
     LoftLabel lb_status;
-    LoftButton dash_btn;
+
+    DashboardButton dash_btn;
 } Bar;
 
 typedef struct Dashboard {
@@ -419,7 +430,6 @@ void _draw_tag (TagLabel* t) {
     cairo_move_to(cr, x, y);
     pango_cairo_show_layout(cr, layout);
 
-
     pango_font_description_free(font_desc);
     g_object_unref(layout);
 
@@ -440,6 +450,54 @@ void _draw_tag (TagLabel* t) {
         cairo_fill(cr);
     }
 
+    cairo_restore(cr);
+    cairo_destroy(cr);
+}
+
+void _draw_dash_btn (DashboardButton* dash_btn) {
+    cairo_t* cr = cairo_create(dash_btn->base.cs);
+    cairo_save(cr);
+
+    if (dash_btn->active) {
+        loft_cairo_set_rgba(cr, &dash_btn->style.active.bg);
+        cairo_rectangle(cr, 0, 0, dash_btn->base.width, dash_btn->base.height);
+        cairo_fill(cr);
+
+        loft_cairo_set_rgba(cr, &dash_btn->style.active.fg);
+
+        double ind_x_left = dash_btn->base.width / 3;
+        double ind_x_center = dash_btn->base.width / 2;
+        double ind_x_right = dash_btn->base.width - ind_x_left;
+
+        double ypx = dash_btn->base.height / 3;
+        double ind_y_base = selmon->bar_pos == TOP ? ypx : dash_btn->base.height - ypx;
+        double ind_y_point = selmon->bar_pos == TOP ? dash_btn->base.height - ypx : ypx;
+
+        cairo_move_to(cr, ind_x_left, ind_y_base);
+        cairo_line_to(cr, ind_x_right, ind_y_base);
+        cairo_line_to(cr, ind_x_center, ind_y_point);
+
+        cairo_fill(cr);
+    } else {
+        loft_cairo_set_rgba(cr, &dash_btn->style.normal.bg);
+        cairo_rectangle(cr, 0, 0, dash_btn->base.width, dash_btn->base.height);
+        cairo_fill(cr);
+
+        loft_cairo_set_rgba(cr, &dash_btn->style.normal.fg);
+
+        double ind_y_top = dash_btn->base.height / 3;
+        double ind_y_center = dash_btn->base.height / 2;
+        double ind_y_bottom = dash_btn->base.height - ind_y_top;
+
+        double ind_x_base = dash_btn->base.width / 3;
+        double ind_x_point = dash_btn->base.width - ind_x_base;
+
+        cairo_move_to(cr, ind_x_base, ind_y_top);
+        cairo_line_to(cr, ind_x_point, ind_y_center);
+        cairo_line_to(cr, ind_x_base, ind_y_bottom);
+    }
+
+    cairo_fill(cr);
     cairo_restore(cr);
     cairo_destroy(cr);
 }
@@ -862,6 +920,8 @@ Monitor* createmon (void) {
 
     loft_window_init(&m->dashboard.win, 5);
     loft_layout_init(&m->dashboard.lt, ASPECT_V, 0, 5);
+
+    loft_rgba_set_from_str(&m->dashboard.win.base.style.base, (char*) dashboard_bg);
 
     loft_widget_override_redirect(&m->dashboard.win.base, true);
     loft_window_set_layout(&m->dashboard.win, &m->dashboard.lt);
@@ -1765,12 +1825,14 @@ void setdashboard (Monitor* m, bool visible) {
         loft_widget_show(&m->dashboard.win.base);
         XRaiseWindow(loftenv.display, m->dashboard.win.base.xwin);
         XSetInputFocus(dpy, m->dashboard.win.base.xwin, RevertToPointerRoot, CurrentTime);
-        loft_button_set_activated(&m->bar->dash_btn, true);
+        m->bar->dash_btn.active = true;
     } else {
         loft_widget_hide(&m->dashboard.win.base);
         focus(selmon->tagfocus[m->current_tag]);
-        loft_button_set_activated(&m->bar->dash_btn, false);
+        m->bar->dash_btn.active = false;
     }
+
+    REDRAW_IF_VISIBLE(&m->bar->dash_btn.base);
 }
 
 bool sendevent (Client *c, Atom proto) {
@@ -2409,10 +2471,14 @@ void updatebars (void) {
         loft_label_init(&m->bar->lb_title, FLOW_L, m->selected != NULL ? m->selected->name : NULL);
         loft_label_init(&m->bar->lb_status, FLOW_R, stext);
 
-        loft_button_init(&m->bar->dash_btn, dash_btn_text);
-        loft_button_set_activatable(&m->bar->dash_btn, true);
+        loft_widget_init(&m->bar->dash_btn.base, "dashboard_button", 0);
+        m->bar->dash_btn.active = false;
 
-        loft_signal_connect(&m->bar->dash_btn.base, "click", _on_dash_btn_click, NULL);
+        // keep arrow consistent by using bar height as minimum size
+        loft_widget_set_minimum_size(&m->bar->dash_btn.base, bh, bh);
+
+        loft_signal_connect(&m->bar->dash_btn.base, "button-press", _on_dash_btn_click, NULL);
+        loft_signal_connect(&m->bar->dash_btn.base, "draw", _draw_dash_btn, NULL);
 
         m->bar->win.base.draw_base = false;
         m->bar->lb_layout.base.draw_base = false;
@@ -2486,7 +2552,7 @@ void updatebars (void) {
             loft_layout_attach(&m->bar->lt_tagstrip, &t->base, EXPAND_X | EXPAND_Y);
         }
 
-        // set widget colors
+        // set colors
 
         loft_rgba_set_from_str(&m->bar->lb_layout.style.normal.bg, (char*) ltsym_bg_color);
         loft_rgba_set_from_str(&m->bar->lb_layout.style.normal.fg, (char*) ltsym_fg_color);
@@ -2500,17 +2566,8 @@ void updatebars (void) {
         loft_rgba_set_from_str(&m->bar->dash_btn.style.normal.bg, (char*) dash_btn_bg_color);
         loft_rgba_set_from_str(&m->bar->dash_btn.style.normal.fg, (char*) dash_btn_fg_color);
 
-        loft_rgba_set_from_str(&m->bar->dash_btn.style.prelight.bg, (char*) dash_btn_prelight_bg_color);
-        loft_rgba_set_from_str(&m->bar->dash_btn.style.prelight.fg, (char*) dash_btn_prelight_fg_color);
-        loft_rgba_set_from_str(&m->bar->dash_btn.style.pressed.bg, (char*) dash_btn_prelight_bg_color);
-        loft_rgba_set_from_str(&m->bar->dash_btn.style.pressed.fg, (char*) dash_btn_prelight_fg_color);
-
         loft_rgba_set_from_str(&m->bar->dash_btn.style.active.bg, (char*) dash_btn_active_bg_color);
         loft_rgba_set_from_str(&m->bar->dash_btn.style.active.fg, (char*) dash_btn_active_fg_color);
-        loft_rgba_set_from_str(&m->bar->dash_btn.style.active_prelight.bg, (char*) dash_btn_active_bg_color);
-        loft_rgba_set_from_str(&m->bar->dash_btn.style.active_prelight.fg, (char*) dash_btn_active_fg_color);
-        loft_rgba_set_from_str(&m->bar->dash_btn.style.active_pressed.bg, (char*) dash_btn_active_bg_color);
-        loft_rgba_set_from_str(&m->bar->dash_btn.style.active_pressed.fg, (char*) dash_btn_active_fg_color);
 
         // override redirect, move, resize, lock size, show
 
