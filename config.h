@@ -66,8 +66,8 @@ static int  bar_pos = TOP;              // bar position, TOP or BOTTOM
 
 static char* tags[] =           { "M1", "M2", "M3", "M4", "M5", "E6", "E7", "E8", "E9" };
 static int layouts_init[] =     {    0,    0,    1,    1,    1,    2,    2,    2,    3 };
-static float mfactors_init[] =  { 0.50, 0.50, 0.70, 0.70, 0.70, 0.70, 0.70, 0.70, 0.70 };
-static int padding_init[] =     {    0,    0,    4,    4,    4,    4,    4,    4,    4 };
+static float mfactors_init[] =  { 0.50, 0.50, 0.65, 0.65, 0.65, 0.65, 0.65, 0.65, 0.50 };
+static int padding_init[] =     {    0,    0,    6,    6,    6,    6,    6,    6,    6 };
 
 //
 // WINDOW RULES
