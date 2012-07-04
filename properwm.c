@@ -1286,8 +1286,8 @@ monocle(Monitor *m) {
 
     int x = m->wx;
     int y = m->wy;
-    int w = m->ww - (2 * border_width);
-    int h = m->wh - (2 * border_width);
+    int w = m->ww;
+    int h = m->wh;
 
     if (monocle_padding) {
         x += padding;
@@ -1297,8 +1297,8 @@ monocle(Monitor *m) {
     }
 
     for (c = nexttiled(m->clients); c != NULL; c = nexttiled(c->next)) {
+        resize(c, x,y, w - (2 * c->bw), h - (2 * c->bw), false);
         n++;
-        resize(c, x,y, w,h, false);
     }
 
     if (n > 0)
