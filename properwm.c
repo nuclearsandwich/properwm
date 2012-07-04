@@ -1233,7 +1233,7 @@ void manage (Window w, XWindowAttributes *wa) {
     XConfigureWindow(dpy, w, CWBorderWidth, &wc);
 
     XSetWindowBorder(dpy, w, border_normal);
-    configure(c); /* propagates border_width, ifsize doesn't change */
+    configure(c);
 
     XSelectInput(dpy, w, EnterWindowMask|FocusChangeMask|PropertyChangeMask|StructureNotifyMask);
     grabbuttons(c, false);
@@ -1246,7 +1246,7 @@ void manage (Window w, XWindowAttributes *wa) {
 
     XChangeProperty(dpy, root, netatom[NetClientList], XA_WINDOW, 32, PropModeAppend,
                     (unsigned char *) &(c->win), 1);
-    XMoveResizeWindow(dpy, c->win, c->x + 2 * sw, c->y, c->w, c->h); /* some windows require this */
+    XMoveResizeWindow(dpy, c->win, c->x + 2 * sw, c->y, c->w, c->h);
 
     setclientstate(c, NormalState);
 
@@ -1262,7 +1262,6 @@ void manage (Window w, XWindowAttributes *wa) {
 
 void mappingnotify (XEvent *e) {
     XMappingEvent *ev = &e->xmapping;
-
     XRefreshKeyboardMapping(ev);
     if (ev->request == MappingKeyboard)
         grabkeys();
@@ -1285,16 +1284,6 @@ monocle(Monitor *m) {
     unsigned int n = 0;
     Client *c;
 
-    for (c = m->clients; c; c = c->next) {
-        if (ISVISIBLE(c))
-            n++;
-    }
-
-    if (n > 0)
-        snprintf(m->ltsymbol, sizeof(m->ltsymbol), "%d", n);
-
-    updatebarlayout(m);
-
     int x = m->wx;
     int y = m->wy;
     int w = m->ww - (2 * border_width);
@@ -1307,8 +1296,15 @@ monocle(Monitor *m) {
         h -= (2 * padding);
     }
 
-    for (c = nexttiled(m->clients); c; c = nexttiled(c->next))
+    for (c = nexttiled(m->clients); c != NULL; c = nexttiled(c->next)) {
+        n++;
         resize(c, x,y, w,h, false);
+    }
+
+    if (n > 0)
+        snprintf(m->ltsymbol, 15, "%d", n);
+
+    updatebarlayout(m);
 }
 
 void motionnotify (XEvent *e) {
@@ -1387,8 +1383,11 @@ void movemouse (const Arg *arg) {
                     ny = selmon->wy + selmon->wh - HEIGHT(c);
             }
 
-            if (c->isfloating == false && selmon->layouts[selmon->current_tag]->arrange && (ev.xmotion.x < x - snap || ev.xmotion.x > x + snap || ev.xmotion.y < y - snap || ev.xmotion.y > y + snap))
+            if (c->isfloating == false && selmon->layouts[selmon->current_tag]->arrange != NULL &&
+                (ev.xmotion.x < x - snap || ev.xmotion.x > x + snap || ev.xmotion.y < y - snap || ev.xmotion.y > y + snap))
+            {
                 togglefloating(NULL);
+            }
 
             if (c->isfloating || selmon->layouts[selmon->current_tag]->arrange == NULL) {
                 if (c->isfullscreen)
@@ -1412,15 +1411,19 @@ void movemouse (const Arg *arg) {
 }
 
 Client* nexttiled (Client *c) {
-    for(; c && (c->isfloating || !ISVISIBLE(c)); c = c->next);
+    for(; c && (c->isfloating || ISVISIBLE(c) == false); c = c->next);
     return c;
 }
 
 int ntiled (Monitor *m) {
     Client *c;
     int nt = 0;
-    for (c = nexttiled(m->clients); c; c = nexttiled(c->next))
-        if (ISVISIBLE(c)) nt++;
+
+    for (c = nexttiled(m->clients); c; c = nexttiled(c->next)) {
+        if (ISVISIBLE(c))
+            nt++;
+    }
+
     return nt;
 }
 
@@ -1432,11 +1435,13 @@ void pop (Client *c) {
 }
 
 Client* prevtiled (Client *c) {
-    Client *p, *r;
+    Client* p;
+    Client* r;
 
-    for(p = selmon->clients, r = NULL; p && p != c; p = p->next)
-        if (!p->isfloating && ISVISIBLE(p))
+    for (p = selmon->clients, r = NULL; p && p != c; p = p->next) {
+        if (p->isfloating == false && ISVISIBLE(p))
             r = p;
+    }
 
     return r;
 }
@@ -1611,18 +1616,18 @@ void resizemouse (const Arg *arg) {
             handler[ev.type](&ev);
             break;
         case MotionNotify:
-            nw = _MAX(ev.xmotion.x - ocx - 2 * c->bw + 1, 1);
-            nh = _MAX(ev.xmotion.y - ocy - 2 * c->bw + 1, 1);
+            nw = _MAX(ev.xmotion.x - ocx - (2 * c->bw) + 1, 1);
+            nh = _MAX(ev.xmotion.y - ocy - (2 * c->bw) + 1, 1);
 
             if (c->mon->wx + nw >= selmon->wx && c->mon->wx + nw <= selmon->wx + selmon->ww
             && c->mon->wy + nh >= selmon->wy && c->mon->wy + nh <= selmon->wy + selmon->wh)
             {
-                if (!c->isfloating && selmon->layouts[selmon->current_tag]->arrange
+                if (c->isfloating == false && selmon->layouts[selmon->current_tag]->arrange != NULL
                 && (abs(nw - c->w) > snap || abs(nh - c->h) > snap))
                     togglefloating(NULL);
             }
 
-            if (!selmon->layouts[selmon->current_tag]->arrange || c->isfloating) {
+            if (selmon->layouts[selmon->current_tag]->arrange == false || c->isfloating) {
                 if (c->isfullscreen)
                     setfullscreen(c, false);
                 resize(c, c->x, c->y, nw, nh, true);
@@ -1766,29 +1771,31 @@ void setfullscreen (Client *c, bool fullscreen) {
         XChangeProperty(dpy, c->win, netatom[NetWMState], XA_ATOM, 32,
                         PropModeReplace, (unsigned char*)&netatom[NetWMFullscreen], 1);
 
+        c->isfloating = true;
         c->isfullscreen = true;
         c->oldbw = c->bw;
         c->bw = 0;
         c->oldstate = c->isfloating;
-        c->isfloating = true;
 
         if (smart_borders)
             updateborders(c->mon);
 
-        resizeclient(c, c->mon->mx, c->mon->my, c->mon->mw, c->mon->mh);
+        resize(c, c->mon->mx, c->mon->my, c->mon->mw, c->mon->mh, false);
         XRaiseWindow(dpy, c->win);
     }
     else {
         XChangeProperty(dpy, c->win, netatom[NetWMState], XA_ATOM, 32,
                         PropModeReplace, (unsigned char*)0, 0);
-        c->isfullscreen = false;
+
         c->isfloating = c->oldstate;
+        c->isfullscreen = false;
         c->bw = c->oldbw;
         c->x = c->oldx;
         c->y = c->oldy;
         c->w = c->oldw;
         c->h = c->oldh;
-        resizeclient(c, c->x, c->y, c->w, c->h);
+
+        resize(c, c->x, c->y, c->w, c->h, false);
     }
 
     arrange(c->mon);
@@ -1804,7 +1811,9 @@ void setlayout (const Arg *arg) {
     const char* ltsym = selmon->layouts[selmon->current_tag]->symbol;
 
     if (ltsym != NULL)
-        strncpy(selmon->ltsymbol, ltsym, 15);
+        snprintf(selmon->ltsymbol, 15, "%s", ltsym);
+    else
+        selmon->ltsymbol[0] = '\0';
 
     updatebarlayout(selmon);
 
@@ -2220,7 +2229,7 @@ void togglefloating (const Arg* arg) {
     if (selmon->selected == NULL)
         return;
 
-    selmon->selected->isfloating = !selmon->selected->isfloating || selmon->selected->isfixed;
+    selmon->selected->isfloating = selmon->selected->isfloating == false || selmon->selected->isfixed;
 
     int oldw;
     int oldh;
@@ -2234,7 +2243,7 @@ void togglefloating (const Arg* arg) {
         resize(selmon->selected, selmon->selected->x, selmon->selected->y, oldw, oldh, false);
 
         if (WIDTH(selmon->selected) > oldw && HEIGHT(selmon->selected) > oldh)
-            resize(selmon->selected, selmon->selected->x, selmon->selected->y, oldw - (2*selmon->selected->bw), oldh - (2*selmon->selected->bw), false);
+            resize(selmon->selected, selmon->selected->x, selmon->selected->y, oldw - (2 * border_width), oldh - (2 * border_width), false);
 
         if (WIDTH(selmon->selected) < oldw && HEIGHT(selmon->selected) < oldh)
             resize(selmon->selected, selmon->selected->x, selmon->selected->y, oldw, oldh, false);
@@ -2471,7 +2480,7 @@ void updatebars (void) {
 }
 
 inline void updatebarlayout (Monitor* m) {
-    loft_label_set_text(&m->bar->lb_layout, m->ltsymbol);
+    REDRAW_IF_VISIBLE(&m->bar->lb_layout.base);
 }
 
 void updatebarstatus (Monitor* m) {
