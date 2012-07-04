@@ -1,4 +1,4 @@
-# properwm - dynamic window manager
+# properwm - dwm on steroids
 # See LICENSE file for copyright and license details.
 
 include config.mk
