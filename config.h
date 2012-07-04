@@ -1,10 +1,24 @@
 //
-// GENERAL APPEARANCE
+// SETTINGS
 //
 
-static const char font_name[] = "Droid Sans";
-static const int font_size = 11;
-static const int bar_height = 26;
+enum {
+    TOP,
+    BOTTOM
+};
+
+static const char font_name[] =     "Droid Sans";
+static const int font_size =        11;
+static const int bar_height =       26;
+static int  bar_pos =               TOP;    // bar position, TOP or BOTTOM
+static unsigned int border_width =  1;      // window border width
+static bool click_to_focus =        true;   // require click to focus windows with mouse, otherwise automatic
+static bool client_indicator =      true;   // draw indicator showing which tag(s) selected client is on
+static int nmaster =                2;
+static bool show_bar =              true;   // bar visibility
+static bool smart_borders =         true;   // only show borders if practical, ie: more than one tiled window + not using monocle layout
+static unsigned int snap =          10;     // window snap threshold
+static bool tiled_size_hints =      false;  // respect size hints for tiled windows
 
 //
 // COLORS
@@ -43,46 +57,18 @@ static const char status_bg_color[] = "#222222CC";
 static const char status_fg_color[] = "#BFBFBF";
 
 //
-// GENERAL SETTINGS
+// MISC SETTINGS
 //
-
-enum {
-    TOP,
-    BOTTOM
-};
-
-static unsigned int border_width = 1;   // window border width
-static unsigned int snap = 8;           // window snap threshold
-
-static bool click_to_focus = true;      // require click to focus windows with mouse, otherwise automatic
-static bool client_indicator = true;    // draw indicator showing which tag(s) selected client is on
-static bool smart_borders = true;       // enable borders only when necessary
-static bool show_bar = true;            // bar visibility
-static int  bar_pos = TOP;              // bar position, TOP or BOTTOM
 
 //
 // TAGS
 //
 
 static char* tags[] =           { "M1", "M2", "M3", "M4", "M5", "E6", "E7", "E8", "E9" };
+
 static int layouts_init[] =     {    0,    0,    1,    1,    1,    2,    2,    2,    3 };
 static float mfactors_init[] =  { 0.50, 0.50, 0.65, 0.65, 0.65, 0.65, 0.65, 0.65, 0.50 };
 static int padding_init[] =     {    0,    0,    6,    6,    6,    6,    6,    6,    6 };
-
-//
-// WINDOW RULES
-//
-
-static Rule rules[] = {
-    /* xprop(1):
-     *    WM_CLASS(STRING) = instance, class
-     *    WM_NAME(STRING) = title
-     */
-    /* class    instance    title    tags mask    isfloating    monitor */
-    { "Gimp", NULL, NULL, 0, true, -1 },
-    { "Pavucontrol", NULL, NULL, 0, true, -1 },
-    { "Pulseaudio-equalizer.py", NULL, NULL, 0, true, -1 },
-};
 
 //
 // LAYOUTS
@@ -97,13 +83,6 @@ static Layout layouts[] = {
 };
 
 //
-// LAYOUT SETTINGS
-//
-
-static int nmaster = 2;
-static bool tiled_size_hints = false;
-
-//
 // COMMANDS
 //
 
@@ -116,6 +95,21 @@ static const char* dmenucmd[] = {
 
 static char* termcmd[]  = { "roxterm", NULL };
 static char* browsercmd[] = { "chromium", NULL };
+
+//
+// WINDOW RULES
+//
+
+static Rule rules[] = {
+    /* xprop(1):
+     *    WM_CLASS(STRING) = instance, class
+     *    WM_NAME(STRING) = title
+     */
+    /* class    instance    title    tags mask    isfloating    monitor */
+    { "Gimp",   NULL,       NULL,    0,           true,         -1 },
+    { "Pavucontrol", NULL,  NULL,    0,           true,         -1 },
+    { "Pulseaudio-equalizer.py", NULL, NULL, 0,   true,         -1 },
+};
 
 //
 // KEYS
@@ -145,8 +139,8 @@ static Key keys[] = {
     { MODKEY,                       XK_minus,       modpadding,        {.i = -2 } },
     { MODKEY,                       XK_equal,      modpadding,        {.i = +2 } },
     { MODKEY,                       XK_x,           resetnmaster,      {0} },
-    { MODKEY,                       XK_h,           modmfact,          {.f = -0.01} },
-    { MODKEY,                       XK_l,           modmfact,          {.f = +0.01} },
+    { MODKEY,                       XK_h,           modmfactor,        {.f = -0.01} },
+    { MODKEY,                       XK_l,           modmfactor,        {.f = +0.01} },
     { MODKEY,                       XK_Return,      zoom,              {0} },
     { MODKEY,                       XK_Tab,         view,              {0} },
     { MODKEY|ShiftMask,             XK_c,           killclient,        {0} },

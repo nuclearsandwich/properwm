@@ -151,7 +151,7 @@ void killclient (const Arg* arg);
 void manage (Window w, XWindowAttributes* wa);
 void mappingnotify (XEvent* e);
 void maprequest (XEvent* e);
-void modmfact (const Arg* arg);
+void modmfactor (const Arg* arg);
 void modnmaster (const Arg* arg);
 void modpadding (const Arg* arg);
 void monocle (Monitor* m);
@@ -204,13 +204,14 @@ void updatebartitle (Monitor* m);
 void updateborders (Monitor* m);
 void updateclientlist (void);
 bool updategeom (void);
+void updateltsymbol (Monitor* m);
 void updatenumlockmask (void);
 void updatesizehints (Client* c);
 void updatestatus (void);
 void updatestruts (Monitor* m);
-void updatewindowtype (Client* c);
 void updatebartags (Monitor* m);
 void updatetitle (Client* c);
+void updatewindowtype (Client* c);
 void updatewmhints (Client* c);
 void view (const Arg* arg);
 Client* wintoclient (Window w);
@@ -565,11 +566,11 @@ void arrange (Monitor *m) {
 }
 
 void arrangemon (Monitor *m) {
-    strncpy(m->ltsymbol, m->layouts[m->current_tag]->symbol, sizeof(m->ltsymbol));
-    updatebarlayout(m);
-
     if (smart_borders)
         updateborders(m);
+
+    if (m->layouts[m->current_tag]->arrange != monocle || m->selected == NULL)
+        updatebarlayout(m);
 
     if (m->layouts[m->current_tag]->arrange != NULL)
         m->layouts[m->current_tag]->arrange(m);
@@ -1126,16 +1127,6 @@ void grabkeys (void) {
     }
 }
 
-void modnmaster (const Arg* arg) {
-    selmon->nmasters[selmon->current_tag] = _MAX(selmon->nmasters[selmon->current_tag] + arg->i, 0);
-    arrange(selmon);
-}
-
-void modpadding (const Arg* arg) {
-    selmon->padding[selmon->current_tag] = _MAX(selmon->padding[selmon->current_tag] + arg->i, 0);
-    arrange(selmon);
-}
-
 #ifdef XINERAMA
 static bool isuniquegeom(XineramaScreenInfo *unique, size_t n, XineramaScreenInfo *info) {
     while (n--) {
@@ -1289,6 +1280,16 @@ void maprequest (XEvent *e) {
         manage(ev->window, &wa);
 }
 
+void modnmaster (const Arg* arg) {
+    selmon->nmasters[selmon->current_tag] = _MAX(selmon->nmasters[selmon->current_tag] + arg->i, 0);
+    arrange(selmon);
+}
+
+void modpadding (const Arg* arg) {
+    selmon->padding[selmon->current_tag] = _MAX(selmon->padding[selmon->current_tag] + arg->i, 0);
+    arrange(selmon);
+}
+
 void
 monocle(Monitor *m) {
     unsigned int n = 0;
@@ -1306,10 +1307,10 @@ monocle(Monitor *m) {
         n++;
     }
 
-    if (n > 0)
+    if (n > 0) {
         snprintf(m->ltsymbol, 15, "%d", n);
-
-    updatebarlayout(m);
+        REDRAW_IF_VISIBLE(&m->bar->lb_layout.base);
+    }
 }
 
 void motionnotify (XEvent *e) {
@@ -1828,17 +1829,17 @@ void setlayout (const Arg *arg) {
     const char* ltsym = selmon->layouts[selmon->current_tag]->symbol;
 
     if (ltsym != NULL)
-        snprintf(selmon->ltsymbol, 15, "%s", ltsym);
+        strncpy(selmon->ltsymbol, ltsym, sizeof(selmon->ltsymbol));
     else
         selmon->ltsymbol[0] = '\0';
 
-    updatebarlayout(selmon);
-
     if (selmon->selected != NULL)
         arrange(selmon);
+    else
+        updatebarlayout(selmon);
 }
 
-void modmfact (const Arg *arg) {
+void modmfactor (const Arg *arg) {
     float f;
 
     if (arg == NULL || selmon->layouts[selmon->current_tag]->arrange == NULL)
@@ -2315,6 +2316,7 @@ void toggleview (const Arg *arg) {
         }
 
         selmon->tagset[selmon->selected_tags] = newtagset;
+
         focus(NULL);
         arrange(selmon);
     }
@@ -2505,6 +2507,7 @@ void updatebars (void) {
 }
 
 inline void updatebarlayout (Monitor* m) {
+    strncpy(m->ltsymbol, m->layouts[m->current_tag]->symbol, sizeof(m->ltsymbol));
     REDRAW_IF_VISIBLE(&m->bar->lb_layout.base);
 }
 
@@ -2877,6 +2880,7 @@ void view (const Arg *arg) {
     }
 
     focus(selmon->tagfocus[selmon->current_tag]);
+
     arrange(selmon);
 }
 
