@@ -12,7 +12,7 @@ static const int bar_height = 26;
 
 // 6-digit colors only
 
-static const char normal_border_color[] = "#222222";
+static const char normal_border_color[] = "#444444";
 static const char selected_border_color[] = "#BFBFBF";
 static const char urgent_border_color[] = "#FF0000";
 
@@ -52,12 +52,10 @@ enum {
 };
 
 static unsigned int border_width = 1;   // window border width
-static unsigned int padding = 8;        // amount of padding between tiled windows
 static unsigned int snap = 8;           // window snap threshold
 
 static bool click_to_focus = true;      // require click to focus windows with mouse, otherwise automatic
 static bool client_indicator = true;    // draw indicator showing which tag(s) selected client is on
-static bool monocle_padding = false;    // use padding in monocle layout
 static bool smart_borders = true;       // enable borders only when necessary
 static bool show_bar = true;            // bar visibility
 static int  bar_pos = TOP;              // bar position, TOP or BOTTOM
@@ -66,7 +64,10 @@ static int  bar_pos = TOP;              // bar position, TOP or BOTTOM
 // TAGS
 //
 
-static char* tags[] = { "M1", "M2", "M3", "M4", "M5", "E6", "E7", "E8", "E9" };
+static char* tags[] =           { "M1", "M2", "M3", "M4", "M5", "E6", "E7", "E8", "E9" };
+static int layouts_init[] =     {    0,    0,    1,    1,    1,    2,    2,    2,    3 };
+static float mfactors_init[] =  { 0.50, 0.50, 0.70, 0.70, 0.70, 0.70, 0.70, 0.70, 0.70 };
+static int padding_init[] =     {    0,    0,    4,    4,    4,    4,    4,    4,    4 };
 
 //
 // WINDOW RULES
@@ -89,9 +90,9 @@ static Rule rules[] = {
 
 static Layout layouts[] = {
     /* symbol     arrange function */
+    { "M", monocle },
     { "S", stack },
     { "T", tile },
-    { "M", monocle },
     { "F", NULL },
 };
 
@@ -99,7 +100,6 @@ static Layout layouts[] = {
 // LAYOUT SETTINGS
 //
 
-static float mfact = 0.50;
 static int nmaster = 2;
 static bool tiled_size_hints = false;
 
@@ -140,17 +140,19 @@ static Key keys[] = {
     { MODKEY,                       XK_k,           focusstack,        {.i = -1 } },
     { MODKEY|ShiftMask,             XK_j,           pushdown,          {.i = +1 } },
     { MODKEY|ShiftMask,             XK_k,           pushup,            {.i = -1 } },
-    { MODKEY,                       XK_a,           incnmaster,        {.i = +1 } },
-    { MODKEY,                       XK_z,           incnmaster,        {.i = -1 } },
+    { MODKEY,                       XK_a,           modnmaster,        {.i = +1 } },
+    { MODKEY,                       XK_z,           modnmaster,        {.i = -1 } },
+    { MODKEY,                       XK_minus,       modpadding,        {.i = -2 } },
+    { MODKEY,                       XK_equal,      modpadding,        {.i = +2 } },
     { MODKEY,                       XK_x,           resetnmaster,      {0} },
-    { MODKEY,                       XK_h,           setmfact,          {.f = -0.02} },
-    { MODKEY,                       XK_l,           setmfact,          {.f = +0.02} },
+    { MODKEY,                       XK_h,           modmfact,          {.f = -0.01} },
+    { MODKEY,                       XK_l,           modmfact,          {.f = +0.01} },
     { MODKEY,                       XK_Return,      zoom,              {0} },
     { MODKEY,                       XK_Tab,         view,              {0} },
     { MODKEY|ShiftMask,             XK_c,           killclient,        {0} },
-    { MODKEY,                       XK_s,           setlayout,         {.v = &layouts[0]} },
-    { MODKEY,                       XK_t,           setlayout,         {.v = &layouts[1]} },
-    { MODKEY,                       XK_m,           setlayout,         {.v = &layouts[2]} },
+    { MODKEY,                       XK_m,           setlayout,         {.v = &layouts[0]} },
+    { MODKEY,                       XK_s,           setlayout,         {.v = &layouts[1]} },
+    { MODKEY,                       XK_t,           setlayout,         {.v = &layouts[2]} },
     { MODKEY,                       XK_f,           setlayout,         {.v = &layouts[3]} },
     { MODKEY,                       XK_space,       togglefloating,    {0} },
     { MODKEY,                       XK_0,           view,              {.ui = -1 } },

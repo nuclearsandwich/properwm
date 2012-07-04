@@ -113,56 +113,58 @@ typedef struct {
     int monitor;
 } Rule;
 
-void applyrules (Client *c);
-bool applysizehints (Client *c, int *x, int *y, int *w, int *h, bool interact);
-void arrange (Monitor *m);
-void arrangemon (Monitor *m);
-void attach (Client *c);
-void attachstack (Client *c);
-void buttonpress (XEvent *e);
+void applyrules (Client* c);
+bool applysizehints (Client* c, int* x, int* y, int* w, int* h, bool interact);
+void arrange (Monitor* m);
+void arrangemon (Monitor* m);
+void attach (Client* c);
+void attachstack (Client* c);
+void buttonpress (XEvent* e);
 void checkotherwm (void);
 void cleanup (void);
-void cleanupmon (Monitor *mon);
-void clearurgent (Client *c);
-void clientmessage (XEvent *e);
-void configure (Client *c);
-void configurenotify (XEvent *e);
-void configurerequest (XEvent *e);
+void cleanupmon (Monitor* mon);
+void clearurgent (Client* c);
+void clientmessage (XEvent* e);
+void configure (Client* c);
+void configurenotify (XEvent* e);
+void configurerequest (XEvent* e);
 Monitor* createmon (void);
-void destroynotify (XEvent *e);
-void detach (Client *c);
-void detachstack (Client *c);
-void die (const char *errstr, ...);
+void destroynotify (XEvent* e);
+void detach (Client* c);
+void detachstack (Client* c);
+void die (const char* errstr, ...);
 Monitor* dirtomon (int dir);
-void enternotify (XEvent *e);
-void focus (Client *c);
-void focusin (XEvent *e);
-void focusmon (const Arg *arg);
-void focusstack (const Arg *arg);
-unsigned long getcolor (const char *colstr);
-bool getrootptr (int *x, int *y);
+void enternotify (XEvent* e);
+void focus (Client* c);
+void focusin (XEvent* e);
+void focusmon (const Arg* arg);
+void focusstack (const Arg* arg);
+unsigned long getcolor (const char* colstr);
+bool getrootptr (int* x, int* y);
 long getstate (Window w);
-bool gettextprop (Window w, Atom atom, char *text, unsigned int size);
-void grabbuttons (Client *c, bool focused);
+bool gettextprop (Window w, Atom atom, char* text, unsigned int size);
+void grabbuttons (Client* c, bool focused);
 void grabkeys (void);
-void incnmaster (const Arg *arg);
 void iteration (void);
 void keypress (XEvent *e);
-void killclient (const Arg *arg);
-void manage (Window w, XWindowAttributes *wa);
-void mappingnotify (XEvent *e);
-void maprequest (XEvent *e);
-void monocle (Monitor *m);
-void motionnotify (XEvent *e);
-void movemouse (const Arg *arg);
-Client* nexttiled (Client *c);
-int ntiled (Monitor *m);
-void pop (Client *);
-Client* prevtiled (Client *c);
-void propertynotify (XEvent *e);
-void pushdown (const Arg *arg);
-void pushup (const Arg *arg);
-void quit (const Arg *arg);
+void killclient (const Arg* arg);
+void manage (Window w, XWindowAttributes* wa);
+void mappingnotify (XEvent* e);
+void maprequest (XEvent* e);
+void modmfact (const Arg* arg);
+void modnmaster (const Arg* arg);
+void modpadding (const Arg* arg);
+void monocle (Monitor* m);
+void motionnotify (XEvent* e);
+void movemouse (const Arg* arg);
+Client* nexttiled (Client* c);
+int ntiled (Monitor* m);
+void pop (Client* c);
+Client* prevtiled (Client* c);
+void propertynotify (XEvent* e);
+void pushdown (const Arg* arg);
+void pushup (const Arg* arg);
+void quit (const Arg* arg);
 Monitor* recttomon (int x, int y, int w, int h);
 void resetnmaster (const Arg* arg);
 void resize (Client* c, int x, int y, int w, int h, bool interact);
@@ -172,12 +174,11 @@ void restack (Monitor* m);
 void run (void);
 void scan (void);
 bool sendevent (Client* c, Atom proto);
-void sendmon (Client* c, Monitor *m);
+void sendmon (Client* c, Monitor* m);
 void setclientstate (Client* c, long state);
 void setfocus (Client* c);
 void setfullscreen (Client* c, bool fullscreen);
 void setlayout (const Arg* arg);
-void setmfact (const Arg* arg);
 bool setstrut (Monitor* m, int pos, int px);
 void setup (void);
 void showhide (Client* c);
@@ -204,20 +205,20 @@ void updateborders (Monitor* m);
 void updateclientlist (void);
 bool updategeom (void);
 void updatenumlockmask (void);
-void updatesizehints (Client *c);
+void updatesizehints (Client* c);
 void updatestatus (void);
-void updatestruts (Monitor *m);
-void updatewindowtype (Client *c);
+void updatestruts (Monitor* m);
+void updatewindowtype (Client* c);
 void updatebartags (Monitor* m);
-void updatetitle (Client *c);
-void updatewmhints (Client *c);
-void view (const Arg *arg);
+void updatetitle (Client* c);
+void updatewmhints (Client* c);
+void view (const Arg* arg);
 Client* wintoclient (Window w);
 Monitor* wintomon (Window w);
-int xerror (Display *dpy, XErrorEvent *ee);
-int xerrordummy (Display *dpy, XErrorEvent *ee);
-int xerrorstart (Display *dpy, XErrorEvent *ee);
-void zoom (const Arg *arg);
+int xerror (Display* dpy, XErrorEvent* ee);
+int xerrordummy (Display* dpy, XErrorEvent* ee);
+int xerrorstart (Display* dpy, XErrorEvent* ee);
+void zoom (const Arg* arg);
 
 unsigned long border_normal;
 unsigned long border_selected;
@@ -228,7 +229,6 @@ char stext[256];
 
 int screen;
 int sw, sh; // screen geometry
-int bh = 0; // bar height
 
 unsigned int numlockmask = 0;
 
@@ -320,10 +320,11 @@ struct Monitor {
     int bar_y;
     bool show_bar;
 
-    Client* tagfocus[LENGTH(tags)];
-    float mfacts[LENGTH(tags)];
-    int nmasters[LENGTH(tags)];
     const Layout *layouts[LENGTH(tags)];
+    float mfactors[LENGTH(tags)];
+    int nmasters[LENGTH(tags)];
+    int padding[LENGTH(tags)];
+    Client* tagfocus[LENGTH(tags)];
 
     int struts[4];
     char ltsymbol[16];
@@ -499,10 +500,10 @@ bool applysizehints (Client *c, int *x, int *y, int *w, int *h, bool interact) {
             *y = m->wy;
     }
 
-    if (*h < bh)
-        *h = bh;
-    if (*w < bh)
-        *w = bh;
+    if (*h < bar_height)
+        *h = bar_height;
+    if (*w < bar_height)
+        *w = bar_height;
 
     if (tiled_size_hints || c->isfloating || c->mon->layouts[c->mon->current_tag]->arrange == NULL) {
         /* see last two sentences in ICCCM 4.1.2.3 */
@@ -835,17 +836,21 @@ Monitor* createmon (void) {
     m->show_bar = show_bar;
 
     for (i = 0; i < LENGTH(tags); i++) {
-        m->tagfocus[i] = NULL;
-        m->layouts[i] = &layouts[0];
-        m->mfacts[i] = mfact;
+        m->layouts[i] = &layouts[layouts_init[i]];
+        m->mfactors[i] = mfactors_init[i];
         m->nmasters[i] = nmaster;
+        m->padding[i] = padding_init[i];
+        m->tagfocus[i] = NULL;
     }
 
-    for (i = 0; i < 4; i++) {
-        if (m->show_bar && ((i == STRUT_TOP && m->bar_pos == TOP) || (i == STRUT_BOTTOM && m->bar_pos == BOTTOM)))
-            m->struts[i] = bh;
-        else
-            m->struts[i] = 0;
+    for (i = 0; i < 4; i++)
+        m->struts[i] = 0;
+
+    if (m->show_bar) {
+        if (m->show_bar && m->bar_pos == TOP)
+            m->struts[STRUT_TOP] = bar_height;
+        else if (m->bar_pos == BOTTOM)
+            m->struts[STRUT_BOTTOM] = bar_height;
     }
 
     updatestruts(m);
@@ -1121,8 +1126,13 @@ void grabkeys (void) {
     }
 }
 
-void incnmaster (const Arg *arg) {
+void modnmaster (const Arg* arg) {
     selmon->nmasters[selmon->current_tag] = _MAX(selmon->nmasters[selmon->current_tag] + arg->i, 0);
+    arrange(selmon);
+}
+
+void modpadding (const Arg* arg) {
+    selmon->padding[selmon->current_tag] = _MAX(selmon->padding[selmon->current_tag] + arg->i, 0);
     arrange(selmon);
 }
 
@@ -1214,7 +1224,7 @@ void manage (Window w, XWindowAttributes *wa) {
     c->x = _MAX(c->x, c->mon->mx);
     /* only fix client y-offset, ifthe client center might cover the bar */
     c->y = _MAX(c->y, ((c->mon->bar_y == c->mon->my) && (c->x + (c->w / 2) >= c->mon->wx)
-               && (c->x + (c->w / 2) < c->mon->wx + c->mon->ww)) ? bh : c->mon->my);
+               && (c->x + (c->w / 2) < c->mon->wx + c->mon->ww)) ? bar_height : c->mon->my);
 
     updatewindowtype(c);
     updatesizehints(c);
@@ -1284,17 +1294,12 @@ monocle(Monitor *m) {
     unsigned int n = 0;
     Client *c;
 
-    int x = m->wx;
-    int y = m->wy;
-    int w = m->ww;
-    int h = m->wh;
+    int p = m->padding[m->current_tag];
 
-    if (monocle_padding) {
-        x += padding;
-        y += padding;
-        w -= (2 * padding);
-        h -= (2 * padding);
-    }
+    int x = m->wx + p;
+    int y = m->wy + p;
+    int w = m->ww - (2 * p);
+    int h = m->wh - (2 * p);
 
     for (c = nexttiled(m->clients); c != NULL; c = nexttiled(c->next)) {
         resize(c, x,y, w - (2 * c->bw), h - (2 * c->bw), false);
@@ -1308,17 +1313,21 @@ monocle(Monitor *m) {
 }
 
 void motionnotify (XEvent *e) {
-    static Monitor *mon = NULL;
-    Monitor *m;
-    XMotionEvent *ev = &e->xmotion;
+    static Monitor* mon = NULL;
+    Monitor* m;
+    XMotionEvent* ev = &e->xmotion;
 
     if (ev->window != root)
         return;
-    if ((m = recttomon(ev->x_root, ev->y_root, 1, 1)) != mon && mon) {
+
+    m = recttomon(ev->x_root, ev->y_root, 1, 1);
+
+    if (m != mon && mon) {
         unfocus(selmon->selected, true);
         selmon = m;
         focus(NULL);
     }
+
     mon = m;
 }
 
@@ -1545,11 +1554,13 @@ Monitor* recttomon (int x, int y, int w, int h) {
     Monitor *m, *r = selmon;
     int a, area = 0;
 
-    for (m = mons; m; m = m->next)
+    for (m = mons; m; m = m->next) {
         if ((a = INTERSECT(x, y, w, h, m)) > area) {
             area = a;
             r = m;
         }
+    }
+
     return r;
 }
 
@@ -1715,13 +1726,17 @@ void scan (void) {
 void sendmon (Client *c, Monitor *m) {
     if (c->mon == m)
         return;
+
     unfocus(c, true);
     detach(c);
     detachstack(c);
+
     c->mon = m;
     c->tags = m->tagset[m->selected_tags]; // assign tags of target monitor
+
     attach(c);
     attachstack(c);
+
     focus(NULL);
     arrange(NULL);
 }
@@ -1744,6 +1759,7 @@ bool sendevent (Client *c, Atom proto) {
             exists = protocols[n] == proto;
         XFree(protocols);
     }
+
     if (exists) {
         ev.type = ClientMessage;
         ev.xclient.window = c->win;
@@ -1753,6 +1769,7 @@ bool sendevent (Client *c, Atom proto) {
         ev.xclient.data.l[1] = CurrentTime;
         XSendEvent(dpy, c->win, false, NoEventMask, &ev);
     }
+
     return exists;
 }
 
@@ -1821,18 +1838,18 @@ void setlayout (const Arg *arg) {
         arrange(selmon);
 }
 
-void setmfact (const Arg *arg) {
+void modmfact (const Arg *arg) {
     float f;
 
     if (arg == NULL || selmon->layouts[selmon->current_tag]->arrange == NULL)
         return;
 
-    f = arg->f < 1.0 ? arg->f + selmon->mfacts[selmon->current_tag] : arg->f - 1.0;
+    f = arg->f < 1.0 ? arg->f + selmon->mfactors[selmon->current_tag] : arg->f - 1.0;
 
     if (f < 0.1 || f > 0.9)
         return;
 
-    selmon->mfacts[selmon->current_tag] = f;
+    selmon->mfactors[selmon->current_tag] = f;
     arrange(selmon);
 }
 
@@ -1877,7 +1894,6 @@ void setup (void) {
 
     sw = DisplayWidth(dpy, screen);
     sh = DisplayHeight(dpy, screen);
-    bh = bar_height;
 
     updategeom();
 
@@ -1961,12 +1977,17 @@ void sigchld (int unused) {
 
 void spawn (const Arg *arg) {
     if (fork() == 0) {
+        char** dcp = (char**) arg->v;
+
         if (dpy)
             close(ConnectionNumber(dpy));
+
         setsid();
-        execvp(((char **)arg->v)[0], (char **)arg->v);
-        fprintf(stderr, "properwm: execvp %s", ((char **)arg->v)[0]);
+        execvp(dcp[0], dcp);
+
+        fprintf(stderr, "properwm: execvp %s", dcp[0]);
         perror(" failed");
+
         exit(EXIT_SUCCESS);
     }
 }
@@ -1977,6 +1998,7 @@ void stack (Monitor *m) {
     int ns; // stack area window count
     int mh; // master area height
     int bw; // border width to use for calculations
+    int p; // window padding
     int mx, sx, rem; // x positions and initial offset calculation
     int mww, mwh; // dimensions for windows in master area
     int sww, swh; // dimensions for windows in stack area
@@ -1998,11 +2020,12 @@ void stack (Monitor *m) {
     ns = n-nm;
 
     if (n > nm)
-        mh = nm ? m->wh * m->mfacts[m->current_tag] : 0;
+        mh = nm ? m->wh * m->mfactors[m->current_tag] : 0;
     else
         mh = m->wh;
 
     bw = (smart_borders && n == 1 ? 0 : border_width);
+    p = m->padding[m->current_tag];
 
     mx = 0;
     sx = 0;
@@ -2010,18 +2033,18 @@ void stack (Monitor *m) {
     if (nm > 0) {
         // MASTER WINDOW WIDTH
 
-        mww = (m->ww - ((2*bw) * nm) - (padding * (nm+1))) / nm;
+        mww = (m->ww - ((2*bw) * nm) - (p * (nm+1))) / nm;
 
         // MASTER WINDOW HEIGHT
         //
         // when (n > nmaster) - subtract top padding and half of middle padding
         // when (n <= nmaster) - subtract both top and bottom padding
 
-        mwh = mh - (2*bw) - (n > nm ? padding + (padding/2) : 2*padding);
+        mwh = mh - (2*bw) - (n > nm ? p + (p/2) : 2*p);
 
         /* MASTER X OFFSET */
 
-        rem = (m->ww - ((2*bw) * nm) - (padding * (nm+1))) % nm;
+        rem = (m->ww - ((2*bw) * nm) - (p * (nm+1))) % nm;
         if (rem > 0)
             mx += (rem/2);
     }
@@ -2033,18 +2056,18 @@ void stack (Monitor *m) {
     if (ns > 0) {
         /* STACK WINDOW WIDTH */
 
-        sww = (m->ww - ((2*bw) * ns) - (padding * (ns+1))) / ns;
+        sww = (m->ww - ((2*bw) * ns) - (p * (ns+1))) / ns;
 
         // STACK WINDOW HEIGHT
         //
         // when (nmaster > 0) - subtract half of middle padding and all of bottom padding
         // when (nmaster == 0) - subtract both top and bottom padding
 
-        swh = m->wh - mh - (2*bw) - (nm > 0 ? (padding/2) + padding : 2*padding);
+        swh = m->wh - mh - (2*bw) - (nm > 0 ? (p/2) + p : 2*p);
 
         /* STACK X OFFSET */
 
-        rem = (m->ww - ((2*bw) * ns) - (padding * (ns+1))) % ns;
+        rem = (m->ww - ((2*bw) * ns) - (p * (ns+1))) % ns;
         if (rem > 0)
             sx += (rem/2);
     }
@@ -2058,16 +2081,16 @@ void stack (Monitor *m) {
     // when (nmaster > 0) - half y padding
     // when (nmaster == 0) - complete y padding
 
-    syp = (nm > 0 ? padding/2 : padding);
+    syp = (nm > 0 ? p/2 : p);
 
     for (i = 0, c = nexttiled(m->clients); c; c = nexttiled(c->next), i++) {
         if (i < nm) {
-            resize(c, m->wx + mx + padding, m->wy + padding, mww, mwh, false);
-            mx += padding + WIDTH(c);
+            resize(c, m->wx + mx + p, m->wy + p, mww, mwh, false);
+            mx += p + WIDTH(c);
         }
         else {
-            resize(c, m->wx + sx + padding, m->wy + mh + syp, sww, swh, false);
-            sx += padding + WIDTH(c);
+            resize(c, m->wx + sx + p, m->wy + mh + syp, sww, swh, false);
+            sx += p + WIDTH(c);
         }
     }
 }
@@ -2098,6 +2121,7 @@ void tile (Monitor *m) {
     int nt; // tile area window count
     int mw; // master area width
     int bw; // border width to use for calculations
+    int p; // window padding
     int my, ty, rem; // y positions and initial offset calculation
     int mww, mwh; // dimensions for windows in master area
     int tww, twh; // dimensions for windows in tile area
@@ -2119,11 +2143,12 @@ void tile (Monitor *m) {
     nt = n-nm;
 
     if (n > nm)
-        mw = nm ? m->ww * m->mfacts[m->current_tag] : 0;
+        mw = nm ? m->ww * m->mfactors[m->current_tag] : 0;
     else
         mw = m->ww;
 
     bw = (smart_borders && n == 1 ? 0 : border_width);
+    p = m->padding[m->current_tag];
 
     my = 0;
     ty = 0;
@@ -2134,12 +2159,12 @@ void tile (Monitor *m) {
         // when (n > nmaster) - subtract all of left padding and half of center padding
         // when (n <= nmaster) - subtract both left and right padding for consistency
 
-        mww = mw - (2*bw) - (n > nm ? padding + (padding/2) : 2*padding);
-        mwh = (m->wh - ((2*bw) * nm) - (padding * (nm+1))) / nm;
+        mww = mw - (2*bw) - (n > nm ? p + (p/2) : 2*p);
+        mwh = (m->wh - ((2*bw) * nm) - (p * (nm+1))) / nm;
 
         // MASTER Y OFFSET
 
-        rem = (m->wh - ((2*bw) * nm) - (padding * (nm+1))) % nm;
+        rem = (m->wh - ((2*bw) * nm) - (p * (nm+1))) % nm;
         if (rem > 0)
             my += (rem/2);
     }
@@ -2154,12 +2179,12 @@ void tile (Monitor *m) {
         // when (nmaster > 0) - subtract half of center padding and all of right padding
         // when (nmaster == 0) - subtract both left and right padding for consistency
 
-        tww = m->ww - mw - (2*bw) - (nm > 0 ? (padding/2) + padding : 2*padding);
-        twh = (m->wh - ((2*bw) * nt) - (padding * (nt+1))) / nt;
+        tww = m->ww - mw - (2*bw) - (nm > 0 ? (p/2) + p : 2*p);
+        twh = (m->wh - ((2*bw) * nt) - (p * (nt+1))) / nt;
 
         // TILE Y OFFSET
 
-        rem = (m->wh - ((2*bw) * nt) - (padding * (nt+1))) % nt;
+        rem = (m->wh - ((2*bw) * nt) - (p * (nt+1))) % nt;
         if (rem > 0)
             ty += (rem/2);
     }
@@ -2173,16 +2198,16 @@ void tile (Monitor *m) {
     // when (nmaster > 0) - half padding
     // when (nmaster == 0) - full padding
 
-    txp = (nm > 0 ? padding/2 : padding);
+    txp = (nm > 0 ? p/2 : p);
 
     for (i = 0, c = nexttiled(m->clients); c; c = nexttiled(c->next), i++) {
         if (i < nm) {
-            resize(c, m->wx + padding, m->wy + my + padding, mww, mwh, false);
-            my += padding + HEIGHT(c);
+            resize(c, m->wx + p, m->wy + my + p, mww, mwh, false);
+            my += p + HEIGHT(c);
         }
         else {
-            resize(c, m->wx + mw + txp, m->wy + ty + padding, tww, twh, false);
-            ty += padding + HEIGHT(c);
+            resize(c, m->wx + mw + txp, m->wy + ty + p, tww, twh, false);
+            ty += p + HEIGHT(c);
         }
     }
 }
@@ -2191,7 +2216,7 @@ void togglebar (const Arg *arg) {
     selmon->show_bar = selmon->show_bar == false;
 
     int pos = selmon->bar_pos == TOP ? STRUT_TOP : STRUT_BOTTOM;
-    setstrut(selmon, pos, selmon->show_bar ? bh : 0);
+    setstrut(selmon, pos, selmon->show_bar ? bar_height : 0);
 
     if (selmon->show_bar)
         loft_widget_show(&selmon->bar->win.base);
@@ -2210,14 +2235,14 @@ void togglebarpos (const Arg* arg) {
     int new_st_pos = selmon->bar_pos == TOP ? STRUT_TOP : STRUT_BOTTOM;
 
     selmon->struts[old_st_pos] = 0;
-    selmon->struts[new_st_pos] += bh;
+    selmon->struts[new_st_pos] += bar_height;
 
     updatestruts(selmon);
 
     if (selmon->bar_pos == TOP)
         selmon->bar_y = selmon->my;
     else
-        selmon->bar_y = selmon->my + (selmon->mh - bh);
+        selmon->bar_y = selmon->my + (selmon->mh - bar_height);
 
     loft_widget_move(&selmon->bar->win.base, selmon->mx, selmon->bar_y);
 
@@ -2462,7 +2487,7 @@ void updatebars (void) {
 
         loft_widget_override_redirect(&m->bar->win.base, true);
         loft_widget_move(&m->bar->win.base, m->mx, m->bar_y);
-        loft_widget_resize(&m->bar->win.base, m->mw, bh);
+        loft_widget_resize(&m->bar->win.base, m->mw, bar_height);
         loft_widget_lock_size(&m->bar->win.base, true);
 
         updatebartags(m);
@@ -2473,7 +2498,7 @@ void updatebars (void) {
         loft_widget_show_all(&m->bar->lt_main.base);
 
         if (show_bar) {
-            setstrut(m, STRUT_TOP, bh);
+            setstrut(m, STRUT_TOP, bar_height);
             loft_widget_show(&m->bar->win.base);
         }
     }
