@@ -630,23 +630,21 @@ void attachstack (Client *c) {
 }
 
 void buttonpress (XEvent *e) {
-    unsigned int i, click;
-    Monitor *m;
-    XButtonPressedEvent *ev = &e->xbutton;
-
-    click = ClkRootWin;
+    XButtonPressedEvent* ev = &e->xbutton;
 
     /* focus monitor if necessary */
 
-    m = wintomon(ev->window);
+    Monitor* m = wintomon(ev->window);
 
     if (m != NULL && m != selmon) {
         unfocus(selmon->selected, true);
         selmon = m;
         focus(NULL);
+        updatemonindicators();
     }
 
-    Client *c = wintoclient(ev->window);
+    int click = ClkRootWin;
+    Client* c = wintoclient(ev->window);
 
     if (c != NULL) {
         focus(c);
@@ -658,6 +656,8 @@ void buttonpress (XEvent *e) {
         click = ClkWinTitle;
     else if (ev->window == selmon->bar->lb_status.base.xwin)
         click = ClkStatusText;
+
+    int i;
 
     for (i = 0; i < LENGTH(buttons); i++)
         if (click == buttons[i].click && buttons[i].func && buttons[i].button == ev->button
@@ -964,21 +964,23 @@ void enternotify (XEvent *e) {
     Monitor *m;
     XCrossingEvent *ev = &e->xcrossing;
 
-    if (click_to_focus)
-        return;
-
     if (ev->window != root && (ev->mode != NotifyNormal || ev->detail == NotifyInferior))
         return;
 
     c = wintoclient(ev->window);
     m = c ? c->mon : wintomon(ev->window);
 
+    if (c == NULL || c == selmon->selected)
+        return;
+
+    if (click_to_focus)
+        return;
+
     if (m != selmon) {
         unfocus(selmon->selected, true);
         selmon = m;
+        updatemonindicators();
     }
-    else if (c == NULL || c == selmon->selected)
-        return;
 
     focus(c);
 }
@@ -991,8 +993,10 @@ void focus (Client *c) {
         unfocus(selmon->selected, false);
 
     if (c) {
-        if (c->mon != selmon)
+        if (c->mon != selmon) {
             selmon = c->mon;
+            updatemonindicators();
+        }
 
         if (c->isurgent)
             clearurgent(c);
@@ -1381,7 +1385,9 @@ monocle(Monitor *m) {
 }
 
 void motionnotify (XEvent *e) {
-    static Monitor* mon = NULL;
+    if (click_to_focus)
+        return;
+
     Monitor* m;
     XMotionEvent* ev = &e->xmotion;
 
@@ -1390,24 +1396,23 @@ void motionnotify (XEvent *e) {
 
     m = recttomon(ev->x_root, ev->y_root, 1, 1);
 
-    if (m != mon && mon != NULL) {
+    if (m != selmon) {
         unfocus(selmon->selected, true);
         selmon = m;
         focus(m->tagfocus[m->current_tag]);
         updatemonindicators();
     }
-
-    mon = m;
 }
 
 void movemouse (const Arg *arg) {
+    if (selmon->selected == NULL)
+        return;
+
     int x, y, ocx, ocy, nx, ny;
-    Client *c;
     Monitor *m;
     XEvent ev;
 
-    if (!(c = selmon->selected))
-        return;
+    Client* c = selmon->selected;
 
     restack(selmon);
 
@@ -1485,6 +1490,7 @@ void movemouse (const Arg *arg) {
         sendmon(c, m);
         selmon = m;
         focus(NULL);
+        updatemonindicators();
     }
 }
 
@@ -1725,6 +1731,7 @@ void resizemouse (const Arg *arg) {
         sendmon(c, m);
         selmon = m;
         focus(NULL);
+        updatemonindicators();
     }
 }
 
@@ -2755,8 +2762,10 @@ bool updategeom (void) {
                     attachstack(c);
                 }
 
-                if (m == selmon)
+                if (m == selmon) {
                     selmon = mons;
+                    updatemonindicators();
+                }
 
                 cleanupmon(m);
             }
