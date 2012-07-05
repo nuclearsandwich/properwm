@@ -198,7 +198,6 @@ void unmanage (Client* c, bool destroyed);
 void unmapnotify (XEvent *e);
 void updatebars (void);
 void updatebarlayout (Monitor* m);
-void updatebarstatus (Monitor* m);
 void updatebartags (Monitor* m);
 void updatebartitle (Monitor* m);
 void updateborders (Monitor* m);
@@ -209,7 +208,6 @@ void updatenumlockmask (void);
 void updatesizehints (Client* c);
 void updatestatus (void);
 void updatestruts (Monitor* m);
-void updatebartags (Monitor* m);
 void updatetitle (Client* c);
 void updatewindowtype (Client* c);
 void updatewmhints (Client* c);
@@ -968,15 +966,15 @@ void focus (Client *c) {
     updatebartitle(selmon);
 }
 
-void focusin (XEvent *e) { /* there are some broken focus acquiring clients */
-    XFocusChangeEvent *ev = &e->xfocus;
+void focusin (XEvent* e) { /* there are some broken focus acquiring clients */
+    XFocusChangeEvent* ev = &e->xfocus;
 
     if (selmon->selected && ev->window != selmon->selected->win)
         setfocus(selmon->selected);
 }
 
-void focusmon (const Arg *arg) {
-    Monitor *m;
+void focusmon (const Arg* arg) {
+    Monitor* m;
 
     if (mons->next == NULL)
         return;
@@ -987,10 +985,11 @@ void focusmon (const Arg *arg) {
 
     unfocus(selmon->selected, true);
     selmon = m;
+
     focus(selmon->tagfocus[selmon->current_tag]);
 }
 
-void focusstack (const Arg *arg) {
+void focusstack (const Arg* arg) {
     Client *c = NULL, *i;
 
     if (selmon->selected == NULL)
@@ -2504,7 +2503,6 @@ void updatebars (void) {
         updatebartags(m);
         updatebarlayout(m);
         updatebartitle(m);
-        updatebarstatus(m);
 
         loft_widget_show_all(&m->bar->lt_main.base);
 
@@ -2518,10 +2516,6 @@ void updatebars (void) {
 inline void updatebarlayout (Monitor* m) {
     strncpy(m->ltsymbol, m->layouts[m->current_tag]->symbol, sizeof(m->ltsymbol));
     REDRAW_IF_VISIBLE(&m->bar->lb_layout.base);
-}
-
-void updatebarstatus (Monitor* m) {
-    REDRAW_IF_VISIBLE(&m->bar->lb_status.base);
 }
 
 void updatebartags (Monitor* m) {
@@ -2745,7 +2739,6 @@ void updatesizehints (Client *c) {
         c->basew = size.min_width;
         c->baseh = size.min_height;
     }
-
     else
         c->basew = c->baseh = 0;
 
@@ -2822,8 +2815,11 @@ void updatetitle (Client *c) {
 
 void updatestatus (void) {
     if (!gettextprop(root, XA_WM_NAME, stext, sizeof(stext)))
-        strcpy(stext, "ProperWM "VERSION);
-    updatebarstatus(selmon);
+        sprintf(stext, "ProperWM %s", VERSION);
+
+    Monitor* m;
+    for (m = mons; m != NULL; m = m->next)
+        loft_label_set_text(&m->bar->lb_status, stext);
 }
 
 void updatewindowtype (Client *c) {
