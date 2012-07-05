@@ -939,7 +939,7 @@ void focus (Client *c) {
     if (c == NULL || ISVISIBLE(c) == false)
         for (c = selmon->stack; c != NULL && ISVISIBLE(c) == false; c = c->snext);
 
-    if (selmon->selected && selmon->selected != c)
+    if (selmon->selected != NULL && selmon->selected != c)
         unfocus(selmon->selected, false);
 
     if (c) {
@@ -987,7 +987,7 @@ void focusmon (const Arg *arg) {
 
     unfocus(selmon->selected, true);
     selmon = m;
-    focus(NULL);
+    focus(selmon->tagfocus[selmon->current_tag]);
 }
 
 void focusstack (const Arg *arg) {
@@ -1280,6 +1280,21 @@ void maprequest (XEvent *e) {
         manage(ev->window, &wa);
 }
 
+void modmfactor (const Arg *arg) {
+    float f;
+
+    if (arg == NULL || selmon->layouts[selmon->current_tag]->arrange == NULL)
+        return;
+
+    f = arg->f < 1.0 ? arg->f + selmon->mfactors[selmon->current_tag] : arg->f - 1.0;
+
+    if (f < 0.1 || f > 0.9)
+        return;
+
+    selmon->mfactors[selmon->current_tag] = f;
+    arrange(selmon);
+}
+
 void modnmaster (const Arg* arg) {
     selmon->nmasters[selmon->current_tag] = _MAX(selmon->nmasters[selmon->current_tag] + arg->i, 0);
     arrange(selmon);
@@ -1303,6 +1318,8 @@ monocle(Monitor *m) {
     int h = m->wh - (2 * p);
 
     for (c = nexttiled(m->clients); c != NULL; c = nexttiled(c->next)) {
+        if (c->mon->selected == c)
+            XRaiseWindow(dpy, c->win);
         resize(c, x,y, w - (2 * c->bw), h - (2 * c->bw), false);
         n++;
     }
@@ -1724,31 +1741,6 @@ void scan (void) {
     }
 }
 
-void sendmon (Client *c, Monitor *m) {
-    if (c->mon == m)
-        return;
-
-    unfocus(c, true);
-    detach(c);
-    detachstack(c);
-
-    c->mon = m;
-    c->tags = m->tagset[m->selected_tags]; // assign tags of target monitor
-
-    attach(c);
-    attachstack(c);
-
-    focus(NULL);
-    arrange(NULL);
-}
-
-void setclientstate (Client *c, long state) {
-    long data[] = { state, None };
-
-    XChangeProperty(dpy, c->win, wmatom[WMState], wmatom[WMState], 32,
-            PropModeReplace, (unsigned char *)data, 2);
-}
-
 bool sendevent (Client *c, Atom proto) {
     int n;
     Atom *protocols;
@@ -1772,6 +1764,41 @@ bool sendevent (Client *c, Atom proto) {
     }
 
     return exists;
+}
+
+void sendmon (Client *c, Monitor *m) {
+    if (c->mon == m)
+        return;
+
+    unfocus(c, true);
+    detach(c);
+    detachstack(c);
+
+    updatebartitle(c->mon);
+    updatebartags(c->mon);
+
+    c->mon->tagfocus[c->mon->current_tag] = NULL;
+
+    c->mon = m;
+    c->tags = m->tagset[m->selected_tags]; // assign tags of target monitor
+
+    attach(c);
+    attachstack(c);
+
+    m->selected = c;
+
+    updatebartags(m);
+    updatebartitle(m);
+
+    focus(NULL);
+    arrange(NULL);
+}
+
+void setclientstate (Client *c, long state) {
+    long data[] = { state, None };
+
+    XChangeProperty(dpy, c->win, wmatom[WMState], wmatom[WMState], 32,
+            PropModeReplace, (unsigned char *)data, 2);
 }
 
 void setfocus (Client *c) {
@@ -1837,21 +1864,6 @@ void setlayout (const Arg *arg) {
         arrange(selmon);
     else
         updatebarlayout(selmon);
-}
-
-void modmfactor (const Arg *arg) {
-    float f;
-
-    if (arg == NULL || selmon->layouts[selmon->current_tag]->arrange == NULL)
-        return;
-
-    f = arg->f < 1.0 ? arg->f + selmon->mfactors[selmon->current_tag] : arg->f - 1.0;
-
-    if (f < 0.1 || f > 0.9)
-        return;
-
-    selmon->mfactors[selmon->current_tag] = f;
-    arrange(selmon);
 }
 
 bool setstrut (Monitor *m, int pos, int px) {
@@ -2111,9 +2123,6 @@ void tagmon (const Arg *arg) {
 
     Monitor* newmon = dirtomon(arg->i);
     sendmon(selmon->selected, newmon);
-
-    updatebartags(selmon);
-    updatebartags(newmon);
 }
 
 void tile (Monitor *m) {
@@ -2512,7 +2521,7 @@ inline void updatebarlayout (Monitor* m) {
 }
 
 void updatebarstatus (Monitor* m) {
-    loft_label_set_text(&m->bar->lb_status, stext);
+    REDRAW_IF_VISIBLE(&m->bar->lb_status.base);
 }
 
 void updatebartags (Monitor* m) {
