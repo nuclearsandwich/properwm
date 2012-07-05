@@ -250,12 +250,16 @@ void (*handler[LASTEvent]) (XEvent *) = {
     [UnmapNotify] = unmapnotify
 };
 
-Atom wmatom[WMLast], netatom[NetLast];
 bool running = true;
+
+Atom wmatom[WMLast], netatom[NetLast];
 Cursor cursor[CurLast];
-Display *dpy;
-Monitor *mons = NULL, *selmon = NULL;
+
+Display* dpy;
 Window root;
+
+Monitor* mons = NULL;
+Monitor* selmon = NULL;
 
 #include "config.h"
 
@@ -347,7 +351,7 @@ struct Monitor {
 
 struct CheckTags { char limitexceeded[LENGTH(tags) > 31 ? -1 : 1]; };
 
-// SIGNAL CALLBACKS
+// LOFT SIGNAL CALLBACKS
 
 void _on_tag_pressed (TagLabel* t, LoftButtonEvent* be) {
     Arg arg = { .ui = 1 << t->num};
@@ -464,13 +468,9 @@ void _draw_selection_indicator (SelectionIndicator* si) {
         fg = &si->style.normal.fg;
     }
 
-    // background
-
     loft_cairo_set_rgba(cr, bg);
     cairo_rectangle(cr, 0, 0, si->base.width, si->base.height);
     cairo_fill(cr);
-
-    // foreground
 
     loft_cairo_set_rgba(cr, fg);
     cairo_arc(cr, si->base.width / 2, si->base.height / 2, si->base.width / 5.0, 0.0, 2.0 * M_PI);
@@ -1198,10 +1198,10 @@ void iteration (void) {
     XEvent ev;
     XNextEvent(dpy, &ev);
 
-    loft_process_event(&ev);
-
     if (handler[ev.type])
         handler[ev.type](&ev);
+
+    loft_process_event(&ev);
 }
 
 void keypress (XEvent *e) {
@@ -1388,20 +1388,19 @@ void motionnotify (XEvent *e) {
     if (click_to_focus)
         return;
 
-    Monitor* m;
     XMotionEvent* ev = &e->xmotion;
 
-    if (ev->window != root)
-        return;
+    static Monitor* mon = NULL;
+    Monitor* m = recttomon(ev->x_root, ev->y_root, 1, 1);
 
-    m = recttomon(ev->x_root, ev->y_root, 1, 1);
-
-    if (m != selmon) {
+    if (mon != NULL && m != selmon && m != mon) {
         unfocus(selmon->selected, true);
         selmon = m;
         focus(m->tagfocus[m->current_tag]);
         updatemonindicators();
     }
+
+    mon = m;
 }
 
 void movemouse (const Arg *arg) {
@@ -2464,7 +2463,6 @@ void updatebars (void) {
         loft_window_init(&m->bar->win, 0);
         loft_layout_init(&m->bar->lt_main, ASPECT_H, 0, 0);
         loft_layout_init(&m->bar->lt_tagstrip, ASPECT_H, 0, 0);
-
         loft_window_set_layout(&m->bar->win, &m->bar->lt_main);
 
         loft_label_init(&m->bar->lb_layout, 0, m->ltsymbol);
@@ -3007,9 +3005,17 @@ Monitor* wintomon (Window w) {
     if (w == root && getrootptr(&x, &y))
         return recttomon(x, y, 1, 1);
 
-    for (m = mons; m; m = m->next)
-        if (w == m->bar->win.base.xwin)
-            return m;
+    LoftWidget* lw;
+
+    for (m = mons; m; m = m->next) {
+        lw = loft_widget_from_xwin(&w);
+
+        if (lw != NULL) {
+            lw = loft_widget_toplevel(lw);
+            if (lw == &m->bar->win.base)
+                return m;
+        }
+    }
 
     if ((c = wintoclient(w)))
         return c->mon;
