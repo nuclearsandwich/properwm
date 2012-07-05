@@ -10,11 +10,12 @@ enum {
 static const char font_name[] =     "Droid Sans";
 static const int font_size =        11;
 static const int bar_height =       26;
+
 static int  bar_pos =               TOP;    // bar position, TOP or BOTTOM
 static unsigned int border_width =  1;      // window border width
 static bool click_to_focus =        true;   // require click to focus windows with mouse, otherwise automatic
 static bool client_indicator =      true;   // draw indicator showing which tag(s) selected client is on
-static int nmaster =                2;
+static int nmaster =                2;      // number of windows in master tiling area
 static bool show_bar =              true;   // bar visibility
 static bool smart_borders =         true;   // only show borders if practical, ie: more than one tiled window + not using monocle layout
 static unsigned int snap =          10;     // window snap threshold
@@ -56,9 +57,11 @@ static const char title_fg_color[] = "#BFBFBF";
 static const char status_bg_color[] = "#222222CC";
 static const char status_fg_color[] = "#BFBFBF";
 
-//
-// MISC SETTINGS
-//
+static const char normal_mon_indicator_bg[] = "#000000CC";
+static const char normal_mon_indicator_fg[] = "#444444CC";
+
+static const char selected_mon_indicator_bg[] = "#000000CC";
+static const char selected_mon_indicator_fg[] = "#628AB3";
 
 //
 // TAGS

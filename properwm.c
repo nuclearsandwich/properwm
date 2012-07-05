@@ -2,6 +2,7 @@
 #include <locale.h>
 
 #include <loft.h>
+#include <math.h>
 
 #include <pthread.h>
 #include <pango/pangocairo.h>
@@ -203,7 +204,7 @@ void updatebartitle (Monitor* m);
 void updateborders (Monitor* m);
 void updateclientlist (void);
 bool updategeom (void);
-void updateltsymbol (Monitor* m);
+void updatemonindicators (void);
 void updatenumlockmask (void);
 void updatesizehints (Client* c);
 void updatestatus (void);
@@ -224,7 +225,7 @@ unsigned long border_selected;
 unsigned long border_urgent;
 
 const char broken[] = "broken";
-char stext[256];
+char status[256];
 
 int screen;
 int sw, sh; // screen geometry
@@ -285,6 +286,17 @@ typedef struct TagLabel {
     bool urgent;
 } TagLabel;
 
+typedef struct SelectionIndicator {
+    LoftWidget base;
+
+    struct {
+        LoftRGBAPair normal;
+        LoftRGBAPair selected;
+    } style;
+
+    bool selected;
+} SelectionIndicator;
+
 typedef struct Bar {
     LoftWindow win;
     LoftLayout lt_main;
@@ -295,6 +307,8 @@ typedef struct Bar {
     LoftLabel lb_layout;
     LoftLabel lb_title;
     LoftLabel lb_status;
+
+    SelectionIndicator* indicator;
 } Bar;
 
 struct Monitor {
@@ -430,6 +444,37 @@ void _draw_tag (TagLabel* t) {
 
         cairo_fill(cr);
     }
+
+    cairo_restore(cr);
+    cairo_destroy(cr);
+}
+
+void _draw_selection_indicator (SelectionIndicator* si) {
+    cairo_t* cr = cairo_create(si->base.cs);
+    cairo_save(cr);
+
+    LoftRGBA* bg;
+    LoftRGBA* fg;
+
+    if (si->selected) {
+        bg = &si->style.selected.bg;
+        fg = &si->style.selected.fg;
+    } else {
+        bg = &si->style.normal.bg;
+        fg = &si->style.normal.fg;
+    }
+
+    // background
+
+    loft_cairo_set_rgba(cr, bg);
+    cairo_rectangle(cr, 0, 0, si->base.width, si->base.height);
+    cairo_fill(cr);
+
+    // foreground
+
+    loft_cairo_set_rgba(cr, fg);
+    cairo_arc(cr, si->base.width / 2, si->base.height / 2, si->base.width / 5.0, 0.0, 2.0 * M_PI);
+    cairo_fill(cr);
 
     cairo_restore(cr);
     cairo_destroy(cr);
@@ -657,7 +702,7 @@ void cleanupmon (Monitor *mon) {
     if (mon == mons)
         mons = mons->next;
     else {
-        for (m = mons; m && m->next != mon; m = m->next);
+        for (m = mons; m != NULL && m->next != mon; m = m->next);
         m->next = mon->next;
     }
 
@@ -674,6 +719,11 @@ void cleanupmon (Monitor *mon) {
     loft_widget_destroy(&mon->bar->lb_status.base);
     loft_widget_destroy(&mon->bar->lt_tagstrip.base);
     loft_widget_destroy(&mon->bar->lt_main.base);
+
+    if (mon->bar->indicator != NULL) {
+        loft_widget_destroy(&mon->bar->indicator->base);
+        free(mon->bar->indicator);
+    }
 
     free(mon->bar);
     free(mon);
@@ -987,6 +1037,7 @@ void focusmon (const Arg* arg) {
     selmon = m;
 
     focus(selmon->tagfocus[selmon->current_tag]);
+    updatemonindicators();
 }
 
 void focusstack (const Arg* arg) {
@@ -1339,10 +1390,11 @@ void motionnotify (XEvent *e) {
 
     m = recttomon(ev->x_root, ev->y_root, 1, 1);
 
-    if (m != mon && mon) {
+    if (m != mon && mon != NULL) {
         unfocus(selmon->selected, true);
         selmon = m;
-        focus(NULL);
+        focus(m->tagfocus[m->current_tag]);
+        updatemonindicators();
     }
 
     mon = m;
@@ -2410,7 +2462,7 @@ void updatebars (void) {
 
         loft_label_init(&m->bar->lb_layout, 0, m->ltsymbol);
         loft_label_init(&m->bar->lb_title, FLOW_L, m->selected != NULL ? m->selected->name : NULL);
-        loft_label_init(&m->bar->lb_status, FLOW_R, stext);
+        loft_label_init(&m->bar->lb_status, FLOW_R, status);
 
         m->bar->win.base.draw_base = false;
         m->bar->lb_layout.base.draw_base = false;
@@ -2425,6 +2477,25 @@ void updatebars (void) {
         loft_layout_attach(&m->bar->lt_main, &m->bar->lb_layout.base, EXPAND_Y);
         loft_layout_attach(&m->bar->lt_main, &m->bar->lb_title.base, EXPAND_X | EXPAND_Y);
         loft_layout_attach(&m->bar->lt_main, &m->bar->lb_status.base, EXPAND_Y);
+
+        if (mons->next != NULL) {
+            m->bar->indicator = malloc(sizeof(SelectionIndicator));
+
+            loft_rgba_set_from_str(&m->bar->indicator->style.normal.bg, (char*) normal_mon_indicator_bg);
+            loft_rgba_set_from_str(&m->bar->indicator->style.normal.fg, (char*) normal_mon_indicator_fg);
+            loft_rgba_set_from_str(&m->bar->indicator->style.selected.bg, (char*) selected_mon_indicator_bg);
+            loft_rgba_set_from_str(&m->bar->indicator->style.selected.fg, (char*) selected_mon_indicator_fg);
+
+            m->bar->indicator->selected = selmon == m;
+
+            loft_widget_init(&m->bar->indicator->base, "selmon_indicator", 0);
+            m->bar->indicator->base.draw_base = false;
+
+            loft_widget_set_minimum_size(&m->bar->indicator->base, bar_height, bar_height);
+            loft_signal_connect(&m->bar->indicator->base, "draw", _draw_selection_indicator, NULL);
+
+            loft_layout_attach(&m->bar->lt_main, &m->bar->indicator->base, EXPAND_Y);
+        }
 
         m->bar->lb_tags = malloc(sizeof(TagLabel) * LENGTH(tags));
 
@@ -2610,8 +2681,8 @@ void updateclientlist (void) {
     Monitor *m;
 
     XDeleteProperty(dpy, root, netatom[NetClientList]);
-    for(m = mons; m; m = m->next)
-        for(c = m->clients; c; c = c->next)
+    for (m = mons; m; m = m->next)
+        for (c = m->clients; c; c = c->next)
             XChangeProperty(dpy, root, netatom[NetClientList],
                             XA_WINDOW, 32, PropModeAppend,
                             (unsigned char *) &(c->win), 1);
@@ -2625,14 +2696,17 @@ bool updategeom (void) {
         int i, j, n, nn;
         Client *c;
         Monitor *m;
+
         XineramaScreenInfo *info = XineramaQueryScreens(dpy, &nn);
         XineramaScreenInfo *unique = NULL;
 
         for (n = 0, m = mons; m; m = m->next, n++);
 
-        /* only consider unique geometries as separate screens */
-        if (!(unique = (XineramaScreenInfo *)malloc(sizeof(XineramaScreenInfo) * nn)))
-            die("fatal: could not malloc() %u bytes\n", sizeof(XineramaScreenInfo) * nn);
+        unique = malloc(sizeof(XineramaScreenInfo) * nn);
+
+        if (unique == NULL)
+            die("fatal: out of memory\n");
+
         for (i = 0, j = 0; i < nn; i++)
             if (isuniquegeom(unique, j, &info[i]))
                 memcpy(&unique[j++], &info[i], sizeof(XineramaScreenInfo));
@@ -2640,10 +2714,12 @@ bool updategeom (void) {
         XFree(info);
         nn = j;
 
+        // init new monitors
+
         if (n <= nn) {
-            for (i = 0; i < (nn - n); i++) { /* new monitors available */
-                for(m = mons; m && m->next; m = m->next);
-                if (m)
+            for (i = 0; i < (nn - n); i++) {
+                for (m = mons; m != NULL && m->next; m = m->next);
+                if (m != NULL)
                     m->next = createmon();
                 else
                     mons = createmon();
@@ -2662,7 +2738,10 @@ bool updategeom (void) {
                     updatestruts(m);
                 }
         }
-        else { /* less monitors available nn < n */
+
+        // clean up unavailable monitors
+
+        else {
             for (i = nn; i < n; i++) {
                 for (m = mons; m && m->next; m = m->next);
 
@@ -2686,11 +2765,11 @@ bool updategeom (void) {
         free(unique);
     }
     else
-#endif/* XINERAMA */
-    /* default monitor setup */
+#endif
     {
         if (mons == NULL)
             mons = createmon();
+
         if (mons->mw != sw || mons->mh != sh) {
             dirty = true;
             mons->mw = mons->ww = sw;
@@ -2707,6 +2786,15 @@ bool updategeom (void) {
     return dirty;
 }
 
+void updatemonindicators (void) {
+    Monitor* m;
+
+    for (m = mons; m != NULL; m = m->next) {
+        m->bar->indicator->selected = selmon == m;
+        REDRAW_IF_VISIBLE(&m->bar->indicator->base);
+    }
+}
+
 void updatenumlockmask (void) {
     unsigned int i, j;
     XModifierKeymap *modmap;
@@ -2714,11 +2802,12 @@ void updatenumlockmask (void) {
     numlockmask = 0;
     modmap = XGetModifierMapping(dpy);
 
-    for(i = 0; i < 8; i++)
-        for(j = 0; j < modmap->max_keypermod; j++)
-            if (modmap->modifiermap[i * modmap->max_keypermod + j]
-               == XKeysymToKeycode(dpy, XK_Num_Lock))
+    for (i = 0; i < 8; i++) {
+        for (j = 0; j < modmap->max_keypermod; j++) {
+            if (modmap->modifiermap[i * modmap->max_keypermod + j] == XKeysymToKeycode(dpy, XK_Num_Lock))
                 numlockmask = (1 << i);
+        }
+    }
 
     XFreeModifiermap(modmap);
 }
@@ -2728,7 +2817,7 @@ void updatesizehints (Client *c) {
     XSizeHints size;
 
     if (!XGetWMNormalHints(dpy, c->win, &size, &msize))
-        /* size is uninitialized, ensure that size.flags aren't used */
+        // size is uninitialized - ensure size.flags isn't used */
         size.flags = PSize;
 
     if (size.flags & PBaseSize) {
@@ -2814,12 +2903,12 @@ void updatetitle (Client *c) {
 }
 
 void updatestatus (void) {
-    if (!gettextprop(root, XA_WM_NAME, stext, sizeof(stext)))
-        sprintf(stext, "ProperWM %s", VERSION);
+    if (!gettextprop(root, XA_WM_NAME, status, sizeof(status)))
+        sprintf(status, "ProperWM %s", VERSION);
 
     Monitor* m;
     for (m = mons; m != NULL; m = m->next)
-        loft_label_set_text(&m->bar->lb_status, stext);
+        loft_label_set_text(&m->bar->lb_status, status);
 }
 
 void updatewindowtype (Client *c) {
