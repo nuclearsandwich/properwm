@@ -140,7 +140,7 @@ static Key keys[] = {
     { MODKEY,                       XK_a,           modnmaster,        {.i = +1 } },
     { MODKEY,                       XK_z,           modnmaster,        {.i = -1 } },
     { MODKEY,                       XK_minus,       modpadding,        {.i = -2 } },
-    { MODKEY,                       XK_equal,      modpadding,        {.i = +2 } },
+    { MODKEY,                       XK_equal,       modpadding,        {.i = +2 } },
     { MODKEY,                       XK_x,           resetnmaster,      {0} },
     { MODKEY,                       XK_h,           modmfactor,        {.f = -0.01} },
     { MODKEY,                       XK_l,           modmfactor,        {.f = +0.01} },
