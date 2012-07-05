@@ -245,7 +245,6 @@ void (*handler[LASTEvent]) (XEvent *) = {
     [KeyPress] = keypress,
     [MappingNotify] = mappingnotify,
     [MapRequest] = maprequest,
-    [MotionNotify] = motionnotify,
     [PropertyNotify] = propertynotify,
     [UnmapNotify] = unmapnotify
 };
@@ -1384,25 +1383,6 @@ monocle(Monitor *m) {
     }
 }
 
-void motionnotify (XEvent *e) {
-    if (click_to_focus)
-        return;
-
-    XMotionEvent* ev = &e->xmotion;
-
-    static Monitor* mon = NULL;
-    Monitor* m = recttomon(ev->x_root, ev->y_root, 1, 1);
-
-    if (mon != NULL && m != selmon && m != mon) {
-        unfocus(selmon->selected, true);
-        selmon = m;
-        focus(m->tagfocus[m->current_tag]);
-        updatemonindicators();
-    }
-
-    mon = m;
-}
-
 void movemouse (const Arg *arg) {
     if (selmon->selected == NULL)
         return;
@@ -2009,7 +1989,7 @@ void setup (void) {
     // select events
 
     wa.cursor = cursor[CurNormal];
-    wa.event_mask = SubstructureRedirectMask|SubstructureNotifyMask|ButtonPressMask|PointerMotionMask
+    wa.event_mask = SubstructureRedirectMask|SubstructureNotifyMask|ButtonPressMask
                     |EnterWindowMask|LeaveWindowMask|StructureNotifyMask|PropertyChangeMask;
 
     XChangeWindowAttributes(dpy, root, CWEventMask|CWCursor, &wa);
