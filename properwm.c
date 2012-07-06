@@ -1374,11 +1374,12 @@ monocle(Monitor *m) {
     int h = m->wh - (2 * p);
 
     for (c = nexttiled(m->clients); c != NULL; c = nexttiled(c->next)) {
-        if (c->mon->selected == c)
-            XRaiseWindow(dpy, c->win);
         resize(c, x,y, w - (2 * c->bw), h - (2 * c->bw), false);
         n++;
     }
+
+    if (m->selected != NULL)
+        XRaiseWindow(dpy, m->selected->win);
 
     if (n > 0) {
         snprintf(m->ltsymbol, 15, "%d", n);
