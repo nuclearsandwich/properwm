@@ -619,6 +619,9 @@ void arrangemon (Monitor *m) {
 
     if (m->layouts[m->current_tag]->arrange != NULL)
         m->layouts[m->current_tag]->arrange(m);
+
+    if (m->selected != NULL)
+        XRaiseWindow(dpy, m->selected->win);
 }
 
 void attach (Client *c) {
@@ -1378,9 +1381,6 @@ monocle(Monitor *m) {
         n++;
     }
 
-    if (m->selected != NULL)
-        XRaiseWindow(dpy, m->selected->win);
-
     if (n > 0) {
         snprintf(m->ltsymbol, 15, "%d", n);
         REDRAW_IF_VISIBLE(&m->bar->lb_layout.base);
@@ -2062,14 +2062,14 @@ void stack (Monitor *m) {
     Client *c;
 
     n = ntiled(m);
+    nm = m->nmasters[m->current_tag];
 
-    if (n <= m->nmasters[m->current_tag]) {
+    if (n <= nm) {
         if (n > 2)
             nm = n-1;
         else
             nm = 1;
-    } else
-        nm = m->nmasters[m->current_tag];
+    }
 
     ns = n-nm;
 
@@ -2182,14 +2182,14 @@ void tile (Monitor *m) {
     Client *c;
 
     n = ntiled(m);
+    nm = m->nmasters[m->current_tag];
 
-    if (n <= m->nmasters[m->current_tag]) {
+    if (n <= nm) {
         if (n > 2)
             nm = n-1;
         else
             nm = 1;
-    } else
-        nm = m->nmasters[m->current_tag];
+    }
 
     nt = n-nm;
 
