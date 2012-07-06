@@ -467,12 +467,15 @@ void _draw_selection_indicator (SelectionIndicator* si) {
         fg = &si->style.normal.fg;
     }
 
+
     loft_cairo_set_rgba(cr, bg);
     cairo_rectangle(cr, 0, 0, si->base.width, si->base.height);
     cairo_fill(cr);
 
+    int min_aspect = _MIN(si->base.width, si->base.height);
+
     loft_cairo_set_rgba(cr, fg);
-    cairo_arc(cr, si->base.width / 2, si->base.height / 2, si->base.width / 5.0, 0.0, 2.0 * M_PI);
+    cairo_arc(cr, si->base.width / 2, si->base.height / 2, min_aspect / 6.0, 0.0, 2.0 * M_PI);
     cairo_fill(cr);
 
     cairo_restore(cr);
@@ -2445,9 +2448,11 @@ void updatebars (void) {
         loft_layout_init(&m->bar->lt_tagstrip, ASPECT_H, 0, 0);
         loft_window_set_layout(&m->bar->win, &m->bar->lt_main);
 
-        loft_label_init(&m->bar->lb_layout, 0, m->ltsymbol);
-        loft_label_init(&m->bar->lb_title, FLOW_L, m->selected != NULL ? m->selected->name : NULL);
-        loft_label_init(&m->bar->lb_status, FLOW_R, status);
+        loft_label_init(&m->bar->lb_layout, m->ltsymbol, 0);
+        loft_label_init(&m->bar->lb_title, m->selected != NULL ? m->selected->name : NULL, FLOW_L);
+        loft_label_init(&m->bar->lb_status, status, FLOW_R);
+
+        loft_label_truncate(&m->bar->lb_title, true);
 
         m->bar->win.base.draw_base = false;
         m->bar->lb_layout.base.draw_base = false;
