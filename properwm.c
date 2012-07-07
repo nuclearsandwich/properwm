@@ -1856,10 +1856,14 @@ void send_to_mon (Client *c, Monitor *m) {
     attach(c);
     attach_stack(c);
 
-    m->selected = c;
-
     update_bar_tags(m);
-    update_bar_title(m);
+
+    if (m->selected == NULL) {
+        m->selected = c;
+        m->tagfocus[m->current_tag] = c;
+        XRaiseWindow(dpy, c->win);
+        update_bar_title(m);
+    }
 
     focus(NULL);
     arrange(NULL);
