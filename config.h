@@ -27,7 +27,7 @@ static bool tiled_size_hints =      false;  // respect size hints for tiled wind
 
 // 6-digit colors only
 
-static const char normal_border_color[] = "#444444";
+static const char normal_border_color[] = "#222222";
 static const char selected_border_color[] = "#BFBFBF";
 static const char urgent_border_color[] = "#FF0000";
 
