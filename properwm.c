@@ -1845,11 +1845,6 @@ void send_to_mon (Client *c, Monitor *m) {
     detach(c);
     detach_stack(c);
 
-    update_bar_title(c->mon);
-    update_bar_tags(c->mon);
-
-    c->mon->tagfocus[c->mon->current_tag] = NULL;
-
     c->mon = m;
     c->tags = m->tagset[m->selected_tags]; // assign tags of target monitor
 
