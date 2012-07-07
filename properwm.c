@@ -4,7 +4,6 @@
 #include <loft.h>
 #include <math.h>
 
-#include <pthread.h>
 #include <pango/pangocairo.h>
 #include <signal.h>
 
