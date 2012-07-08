@@ -2009,6 +2009,8 @@ void setup (void) {
     update_bar_mon_selections();
     update_status();
 
+    printf("done init\n");
+
     /* init border colors */
 
     border_normal = get_color(normal_border_color);
@@ -2591,6 +2593,9 @@ inline void update_bar_layout (Monitor* m) {
 }
 
 void update_bar_mon_selections (void) {
+    if (mons->next == NULL)
+        return;
+
     Monitor* m;
 
     for (m = mons; m != NULL; m = m->next) {
