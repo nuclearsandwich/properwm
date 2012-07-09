@@ -49,16 +49,40 @@
 
 #define TAGMASK                 ((1 << LENGTH(tags)) - 1)
 
-enum { CurNormal, CurResize, CurMove, CurLast };
-enum { NetSupported,
-       NetWMName, NetWMState,
-       NetWMFullscreen, NetActiveWindow,
-       NetWMWindowType, NetWMWindowTypeDialog,
-       NetClientList,
-       NetLast };
-enum { WMProtocols, WMDelete, WMState, WMTakeFocus, WMLast };
-enum { ClickLayout, ClickStatus, ClickTitle,
-       ClickWindow, ClickRoot };
+enum {
+    CursorNormal,
+    CursorMove,
+    CursorResize,
+    CursorLast
+};
+
+enum {
+    NetActiveWindow,
+    NetClientList,
+    NetSupported,
+    NetWMName,
+    NetWMState,
+    NetWMFullscreen,
+    NetWMWindowType,
+    NetWMWindowTypeDialog,
+    NetLast
+};
+
+enum {
+    WMDelete,
+    WMProtocols,
+    WMState,
+    WMTakeFocus,
+    WMLast
+};
+
+enum {
+    ClickLayout,
+    ClickTitle,
+    ClickStatus,
+    ClickWindow,
+    ClickRoot
+};
 
 typedef union {
     int i;
@@ -306,7 +330,7 @@ char status[256];
 
 unsigned int numlockmask = 0;
 Atom wmatom[WMLast], netatom[NetLast];
-Cursor cursor[CurLast];
+Cursor cursor[CursorLast];
 
 int (*xerrorxlib)(Display *, XErrorEvent *);
 
@@ -1429,7 +1453,7 @@ void move_mouse (const Arg *arg) {
     ocx = c->x;
     ocy = c->y;
 
-    if (XGrabPointer(dpy, root, false, MOUSEMASK, GrabModeAsync, GrabModeAsync, None, cursor[CurMove], CurrentTime) != GrabSuccess)
+    if (XGrabPointer(dpy, root, false, MOUSEMASK, GrabModeAsync, GrabModeAsync, None, cursor[CursorMove], CurrentTime) != GrabSuccess)
         return;
 
     if (!get_root_ptr(&x, &y))
@@ -1717,7 +1741,7 @@ void resize_mouse (const Arg* arg) {
     ocx = c->x;
     ocy = c->y;
 
-    if (XGrabPointer(dpy, root, false, MOUSEMASK, GrabModeAsync, GrabModeAsync, None, cursor[CurResize], CurrentTime) != GrabSuccess)
+    if (XGrabPointer(dpy, root, false, MOUSEMASK, GrabModeAsync, GrabModeAsync, None, cursor[CursorResize], CurrentTime) != GrabSuccess)
         return;
 
     XWarpPointer(dpy, None, c->win, 0, 0, 0, 0, c->w + c->bw - 1, c->h + c->bw - 1);
@@ -2017,9 +2041,9 @@ void setup (void) {
     netatom[NetWMWindowTypeDialog] = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE_DIALOG", false);
     netatom[NetClientList] = XInternAtom(dpy, "_NET_CLIENT_LIST", false);
 
-    cursor[CurNormal] = XCreateFontCursor(dpy, XC_left_ptr);
-    cursor[CurResize] = XCreateFontCursor(dpy, XC_sizing);
-    cursor[CurMove] = XCreateFontCursor(dpy, XC_fleur);
+    cursor[CursorNormal] = XCreateFontCursor(dpy, XC_left_ptr);
+    cursor[CursorResize] = XCreateFontCursor(dpy, XC_sizing);
+    cursor[CursorMove] = XCreateFontCursor(dpy, XC_fleur);
 
     border_normal = get_color(normal_border_color);
     border_selected = get_color(selected_border_color);
@@ -2029,7 +2053,7 @@ void setup (void) {
             PropModeReplace, (unsigned char *) netatom, NetLast);
     XDeleteProperty(dpy, root, netatom[NetClientList]);
 
-    wa.cursor = cursor[CurNormal];
+    wa.cursor = cursor[CursorNormal];
     wa.event_mask = SubstructureRedirectMask|SubstructureNotifyMask|ButtonPressMask
                     |EnterWindowMask|LeaveWindowMask|StructureNotifyMask|PropertyChangeMask;
 

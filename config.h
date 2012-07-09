@@ -103,15 +103,20 @@ static char* browsercmd[] = { "chromium", NULL };
 // WINDOW RULES
 //
 
+#define TAG(N) 1 << (N - 1)
+
 static Rule rules[] = {
-    /* xprop(1):
-     *    WM_CLASS(STRING) = instance, class
-     *    WM_NAME(STRING) = title
-     */
-    /* class    instance    title    tags mask    isfloating    monitor */
-    { "Gimp",   NULL,       NULL,    0,           true,         -1 },
-    { "Pavucontrol", NULL,  NULL,    0,           true,         -1 },
-    { "Pulseaudio-equalizer.py", NULL, NULL, 0,   true,         -1 },
+//
+// xprop(1):
+//    WM_CLASS(STRING) = instance, class
+//    WM_NAME(STRING) = title
+//
+// ARGUMENTS: class, instance, title, tag mask, isfloating, monitor
+//
+    { "Roxterm", NULL, NULL, TAG(1) | TAG(3), false, -1 },
+    { "Gimp", NULL, NULL, 0, true, -1 },
+    { "Pavucontrol", NULL, NULL, 0, true, -1 },
+    { "Pulseaudio-equalizer.py", NULL, NULL, 0, true, -1 },
 };
 
 //
@@ -121,53 +126,53 @@ static Rule rules[] = {
 #define MODKEY Mod4Mask
 
 #define TAG_KEYS(KEY,TAG) \
-    { MODKEY,                       KEY,            view,               {.ui = 1 << TAG} }, \
-    { MODKEY|ControlMask,           KEY,            toggle_view,        {.ui = 1 << TAG} }, \
-    { MODKEY|ShiftMask,             KEY,            tag,                {.ui = 1 << TAG} }, \
-    { MODKEY|ControlMask|ShiftMask, KEY,            toggle_tag,         {.ui = 1 << TAG} },
+    { MODKEY,                       KEY,            view,               {.ui = 1 << (TAG - 1)} }, \
+    { MODKEY|ControlMask,           KEY,            toggle_view,        {.ui = 1 << (TAG - 1)} }, \
+    { MODKEY|ShiftMask,             KEY,            tag,                {.ui = 1 << (TAG - 1)} }, \
+    { MODKEY|ControlMask|ShiftMask, KEY,            toggle_tag,         {.ui = 1 << (TAG - 1)} }
 
 static Key keys[] = {
-    /* modifier                     key             function            argument */
-    { MODKEY,                       XK_p,           spawn,              {.v = dmenucmd } },
-    { MODKEY|ShiftMask,             XK_Return,      spawn,              {.v = termcmd } },
-    { MODKEY|ShiftMask,             XK_b,           spawn,              {.v = browsercmd } },
-    { MODKEY,                       XK_b,           toggle_bar,         {0} },
-    { MODKEY,                       XK_v,           toggle_bar_pos,     {0} },
-    { MODKEY,                       XK_j,           focus_stack,        {.i = +1 } },
-    { MODKEY,                       XK_k,           focus_stack,        {.i = -1 } },
-    { MODKEY|ShiftMask,             XK_j,           push_down,          {.i = +1 } },
-    { MODKEY|ShiftMask,             XK_k,           push_up,            {.i = -1 } },
-    { MODKEY,                       XK_a,           mod_nmaster,        {.i = +1 } },
-    { MODKEY,                       XK_z,           mod_nmaster,        {.i = -1 } },
-    { MODKEY,                       XK_minus,       mod_padding,        {.i = -2 } },
-    { MODKEY,                       XK_equal,       mod_padding,        {.i = +2 } },
-    { MODKEY,                       XK_x,           reset_nmaster,      {0} },
-    { MODKEY,                       XK_h,           mod_mfactor,        {.f = -0.01} },
-    { MODKEY,                       XK_l,           mod_mfactor,        {.f = +0.01} },
-    { MODKEY,                       XK_Return,      zoom,               {0} },
-    { MODKEY,                       XK_Tab,         view,               {0} },
-    { MODKEY|ShiftMask,             XK_c,           kill_client,        {0} },
-    { MODKEY,                       XK_m,           set_layout,         {.v = &layouts[0]} },
-    { MODKEY,                       XK_s,           set_layout,         {.v = &layouts[1]} },
-    { MODKEY,                       XK_t,           set_layout,         {.v = &layouts[2]} },
-    { MODKEY,                       XK_f,           set_layout,         {.v = &layouts[3]} },
-    { MODKEY,                       XK_space,       toggle_floating,    {0} },
-    { MODKEY,                       XK_0,           view,               {.ui = -1 } },
-    { MODKEY|ShiftMask,             XK_0,           tag,                {.ui = -1 } },
-    { MODKEY,                       XK_comma,       focus_mon,          {.i = -1 } },
-    { MODKEY,                       XK_period,      focus_mon,          {.i = +1 } },
-    { MODKEY|ShiftMask,             XK_comma,       tag_mon,            {.i = -1 } },
-    { MODKEY|ShiftMask,             XK_period,      tag_mon,            {.i = +1 } },
-    TAG_KEYS(                        XK_1,                               0)
-    TAG_KEYS(                        XK_2,                               1)
-    TAG_KEYS(                        XK_3,                               2)
-    TAG_KEYS(                        XK_4,                               3)
-    TAG_KEYS(                        XK_5,                               4)
-    TAG_KEYS(                        XK_6,                               5)
-    TAG_KEYS(                        XK_7,                               6)
-    TAG_KEYS(                        XK_8,                               7)
-    TAG_KEYS(                        XK_9,                               8)
-    { MODKEY|ShiftMask,             XK_q,           quit,               {0} },
+//  modifier                        key             function            argument */
+    { MODKEY,                       XK_p,           spawn,              { .v = dmenucmd } },
+    { MODKEY|ShiftMask,             XK_Return,      spawn,              { .v = termcmd } },
+    { MODKEY|ShiftMask,             XK_b,           spawn,              { .v = browsercmd } },
+    { MODKEY,                       XK_b,           toggle_bar,         { 0 } },
+    { MODKEY,                       XK_v,           toggle_bar_pos,     { 0 } },
+    { MODKEY,                       XK_j,           focus_stack,        { .i = +1 } },
+    { MODKEY,                       XK_k,           focus_stack,        { .i = -1 } },
+    { MODKEY|ShiftMask,             XK_j,           push_down,          { .i = +1 } },
+    { MODKEY|ShiftMask,             XK_k,           push_up,            { .i = -1 } },
+    { MODKEY,                       XK_a,           mod_nmaster,        { .i = +1 } },
+    { MODKEY,                       XK_z,           mod_nmaster,        { .i = -1 } },
+    { MODKEY,                       XK_minus,       mod_padding,        { .i = -2 } },
+    { MODKEY,                       XK_equal,       mod_padding,        { .i = +2 } },
+    { MODKEY,                       XK_x,           reset_nmaster,      { 0} },
+    { MODKEY,                       XK_h,           mod_mfactor,        { .f = -0.01 } },
+    { MODKEY,                       XK_l,           mod_mfactor,        { .f = +0.01 } },
+    { MODKEY,                       XK_Return,      zoom,               { 0 } },
+    { MODKEY,                       XK_Tab,         view,               { 0 } },
+    { MODKEY|ShiftMask,             XK_c,           kill_client,        { 0 } },
+    { MODKEY,                       XK_m,           set_layout,         { .v = &layouts[0] } },
+    { MODKEY,                       XK_s,           set_layout,         { .v = &layouts[1] } },
+    { MODKEY,                       XK_t,           set_layout,         { .v = &layouts[2] } },
+    { MODKEY,                       XK_f,           set_layout,         { .v = &layouts[3] } },
+    { MODKEY,                       XK_space,       toggle_floating,    { 0} },
+    { MODKEY,                       XK_0,           view,               { .ui = -1 } },
+    { MODKEY|ShiftMask,             XK_0,           tag,                { .ui = -1 } },
+    { MODKEY,                       XK_comma,       focus_mon,          { .i = -1 } },
+    { MODKEY,                       XK_period,      focus_mon,          { .i = +1 } },
+    { MODKEY|ShiftMask,             XK_comma,       tag_mon,            { .i = -1 } },
+    { MODKEY|ShiftMask,             XK_period,      tag_mon,            { .i = +1 } },
+    TAG_KEYS(                       XK_1,                               1),
+    TAG_KEYS(                       XK_2,                               2),
+    TAG_KEYS(                       XK_3,                               3),
+    TAG_KEYS(                       XK_4,                               4),
+    TAG_KEYS(                       XK_5,                               5),
+    TAG_KEYS(                       XK_6,                               6),
+    TAG_KEYS(                       XK_7,                               7),
+    TAG_KEYS(                       XK_8,                               8),
+    TAG_KEYS(                       XK_9,                               9),
+    { MODKEY|ShiftMask,             XK_q,           quit,               { 0 } },
 };
 
 //
@@ -177,15 +182,15 @@ static Key keys[] = {
 //
 
 static Button buttons[] = {
-    /* click                event mask      button          function        argument */
-    { ClickLayout,          0,              Button1,        set_layout,      {.v = &layouts[0]} },
-    { ClickLayout,          0,              Button3,        set_layout,      {.v = &layouts[1]} },
-    { ClickLayout,          MODKEY,         Button1,        set_layout,      {.v = &layouts[2]} },
-    { ClickLayout,          MODKEY,         Button3,        set_layout,      {.v = &layouts[3]} },
-    { ClickStatus,        0,              Button3,        spawn,          {.v = termcmd } },
-    { ClickTitle,          0,              Button1,        zoom,           {0} },
-    { ClickWindow,         MODKEY,         Button1,        move_mouse,      {0} },
-    { ClickWindow,         MODKEY,         Button2,        toggle_floating, {0} },
-    { ClickWindow,         MODKEY,         Button3,        resize_mouse,    {0} },
+//    click             event mask      button      function          argument */
+    { ClickLayout,      0,              Button1,    set_layout,       { .v = &layouts[0] } },
+    { ClickLayout,      0,              Button3,    set_layout,       { .v = &layouts[1] } },
+    { ClickLayout,      MODKEY,         Button1,    set_layout,       { .v = &layouts[2] } },
+    { ClickLayout,      MODKEY,         Button3,    set_layout,       { .v = &layouts[3] } },
+    { ClickStatus,      0,              Button3,    spawn,            { .v = termcmd } },
+    { ClickTitle,       0,              Button1,    zoom,             { 0 } },
+    { ClickWindow,      MODKEY,         Button1,    move_mouse,       { 0 } },
+    { ClickWindow,      MODKEY,         Button2,    toggle_floating,  { 0 } },
+    { ClickWindow,      MODKEY,         Button3,    resize_mouse,     { 0 } },
 };
 
