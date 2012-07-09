@@ -2422,6 +2422,8 @@ void toggle_view (const Arg* arg) {
 
         if (selmon->selected == NULL)
             focus(selmon->tagfocus[newtag]);
+        else
+            update_bar_tags(selmon);
 
         arrange(selmon);
     }
