@@ -1,3 +1,16 @@
+#define BUTTONMASK              (ButtonPressMask|ButtonReleaseMask)
+#define CLEANMASK(mask)         (mask & ~(numlockmask|LockMask) & (ShiftMask|ControlMask|Mod1Mask|Mod2Mask|Mod3Mask|Mod4Mask|Mod5Mask))
+#define INTERSECT(x,y,w,h,m)    (MAX(0, MIN((x)+(w),(m)->wx+(m)->ww) - MAX((x),(m)->wx)) \
+                               * MAX(0, MIN((y)+(h),(m)->wy+(m)->wh) - MAX((y),(m)->wy)))
+#define ISVISIBLE(C)            ((C->tags & C->mon->tagset[C->mon->selected_tags]))
+#define LENGTH(X)               (sizeof X / sizeof X[0])
+#define MAX(A, B)               ((A) > (B) ? (A) : (B))
+#define MIN(A, B)               ((A) < (B) ? (A) : (B))
+#define MOUSEMASK               (BUTTONMASK|PointerMotionMask)
+#define WIDTH(X)                ((X)->w + 2 * (X)->bw)
+#define HEIGHT(X)               ((X)->h + 2 * (X)->bw)
+#define TAGMASK                 ((1 << LENGTH(tags)) - 1)
+
 #include <errno.h>
 #include <locale.h>
 
@@ -32,20 +45,6 @@
 #ifdef XINERAMA
 #include <X11/extensions/Xinerama.h>
 #endif
-
-/* macros */
-#define BUTTONMASK              (ButtonPressMask|ButtonReleaseMask)
-#define CLEANMASK(mask)         (mask & ~(numlockmask|LockMask) & (ShiftMask|ControlMask|Mod1Mask|Mod2Mask|Mod3Mask|Mod4Mask|Mod5Mask))
-#define INTERSECT(x,y,w,h,m)    (_MAX(0, _MIN((x)+(w),(m)->wx+(m)->ww) - _MAX((x),(m)->wx)) \
-                               * _MAX(0, _MIN((y)+(h),(m)->wy+(m)->wh) - _MAX((y),(m)->wy)))
-#define ISVISIBLE(C)            ((C->tags & C->mon->tagset[C->mon->selected_tags]))
-#define LENGTH(X)               (sizeof X / sizeof X[0])
-#define _MAX(A, B)               ((A) > (B) ? (A) : (B))
-#define _MIN(A, B)               ((A) < (B) ? (A) : (B))
-#define MOUSEMASK               (BUTTONMASK|PointerMotionMask)
-#define WIDTH(X)                ((X)->w + 2 * (X)->bw)
-#define HEIGHT(X)               ((X)->h + 2 * (X)->bw)
-#define TAGMASK                 ((1 << LENGTH(tags)) - 1)
 
 enum { CurNormal, CurResize, CurMove, CurLast };
 enum { NetSupported,
@@ -164,9 +163,11 @@ typedef struct Bar {
     SelectionIndicator* indicator;
 } Bar;
 
+
 //
 // FUNCTION DECLARATIONS
 //
+
 
 void apply_rules (Client* c);
 bool apply_size_hints (Client* c, int* x, int* y, int* w, int* h, bool interact);
@@ -275,9 +276,23 @@ int xerror_dummy (Display* dpy, XErrorEvent* ee);
 int xerror_start (Display* dpy, XErrorEvent* ee);
 void zoom (const Arg* arg);
 
+
 //
 // GLOBALS
 //
+
+
+bool running = true;
+
+Display* dpy;
+Window root;
+
+int screen;
+int scr_width, scr_height;
+
+Monitor* mons = NULL;
+Monitor* selmon = NULL;
+bool multimon = false;
 
 unsigned long border_normal;
 unsigned long border_selected;
@@ -286,10 +301,9 @@ unsigned long border_urgent;
 const char broken[] = "broken";
 char status[256];
 
-int screen;
-int sw, sh; // screen geometry
-
 unsigned int numlockmask = 0;
+Atom wmatom[WMLast], netatom[NetLast];
+Cursor cursor[CurLast];
 
 int (*xerrorxlib)(Display *, XErrorEvent *);
 
@@ -308,22 +322,14 @@ void (*handler[LASTEvent]) (XEvent *) = {
     [UnmapNotify] = unmap_notify
 };
 
-bool running = true;
-
-Atom wmatom[WMLast], netatom[NetLast];
-Cursor cursor[CurLast];
-
-Display* dpy;
-Window root;
-
-Monitor* mons = NULL;
-Monitor* selmon = NULL;
-
-//
-// CONFIG-DEPENDENT TYPES
-//
 
 #include "config.h"
+
+
+//
+// PER-TAG DEPENDENT TYPES
+//
+
 
 struct Monitor {
     int num;
@@ -359,11 +365,11 @@ struct Monitor {
     Monitor *next;
 };
 
-struct CheckTags { char limitexceeded[LENGTH(tags) > 31 ? -1 : 1]; };
 
 //
 // LOFT SIGNAL CALLBACKS
 //
+
 
 void _on_tag_pressed (TagLabel* t, LoftButtonEvent* be) {
     Arg arg = { .ui = 1 << t->num};
@@ -485,7 +491,7 @@ void _draw_selection_indicator (SelectionIndicator* si) {
     cairo_rectangle(cr, 0, 0, si->base.width, si->base.height);
     cairo_fill(cr);
 
-    int min_aspect = _MIN(si->base.width, si->base.height);
+    int min_aspect = MIN(si->base.width, si->base.height);
 
     loft_cairo_set_rgba(cr, fg);
     cairo_arc(cr, si->base.width / 2, si->base.height / 2, min_aspect / 6.0, 0.0, 2.0 * M_PI);
@@ -536,14 +542,14 @@ bool apply_size_hints (Client *c, int *x, int *y, int *w, int *h, bool interact)
     Monitor *m = c->mon;
 
     /* set minimum possible */
-    *w = _MAX(1, *w);
-    *h = _MAX(1, *h);
+    *w = MAX(1, *w);
+    *h = MAX(1, *h);
 
     if (interact) {
-        if (*x > sw)
-            *x = sw - WIDTH(c);
-        if (*y > sh)
-            *y = sh - HEIGHT(c);
+        if (*x > scr_width)
+            *x = scr_width - WIDTH(c);
+        if (*y > scr_height)
+            *y = scr_height - HEIGHT(c);
         if (*x + *w + 2 * c->bw < 0)
             *x = 0;
         if (*y + *h + 2 * c->bw < 0)
@@ -598,13 +604,13 @@ bool apply_size_hints (Client *c, int *x, int *y, int *w, int *h, bool interact)
 
         /* restore base dimensions */
 
-        *w = _MAX(*w + c->basew, c->minw);
-        *h = _MAX(*h + c->baseh, c->minh);
+        *w = MAX(*w + c->basew, c->minw);
+        *h = MAX(*h + c->baseh, c->minh);
 
         if (c->maxw)
-            *w = _MIN(*w, c->maxw);
+            *w = MIN(*w, c->maxw);
         if (c->maxh)
-            *h = _MIN(*h, c->maxh);
+            *h = MIN(*h, c->maxh);
     }
 
     return *x != c->x || *y != c->y || *w != c->w || *h != c->h;
@@ -773,9 +779,9 @@ void configure_notify (XEvent *e) {
     bool dirty;
 
     if (ev->window == root) {
-        dirty = (sw != ev->width);
-        sw = ev->width;
-        sh = ev->height;
+        dirty = (scr_width != ev->width);
+        scr_width = ev->width;
+        scr_height = ev->height;
 
         if (update_geom() || dirty) {
             update_bars();
@@ -1219,7 +1225,7 @@ void iteration (void) {
     if (handler[ev.type])
         handler[ev.type](&ev);
 
-    loft_process_event(&ev);
+    loft_process(&ev);
 }
 
 void key_press (XEvent *e) {
@@ -1284,9 +1290,9 @@ void manage (Window w, XWindowAttributes *wa) {
     if (c->y + HEIGHT(c) > c->mon->my + c->mon->mh)
         c->y = c->mon->my + c->mon->mh - HEIGHT(c);
 
-    c->x = _MAX(c->x, c->mon->mx);
+    c->x = MAX(c->x, c->mon->mx);
     /* only fix client y-offset, ifthe client center might cover the bar */
-    c->y = _MAX(c->y, ((c->mon->bar_y == c->mon->my) && (c->x + (c->w / 2) >= c->mon->wx)
+    c->y = MAX(c->y, ((c->mon->bar_y == c->mon->my) && (c->x + (c->w / 2) >= c->mon->wx)
                && (c->x + (c->w / 2) < c->mon->wx + c->mon->ww)) ? bar_height : c->mon->my);
 
     update_window_type(c);
@@ -1319,7 +1325,7 @@ void manage (Window w, XWindowAttributes *wa) {
 
     XChangeProperty(dpy, root, netatom[NetClientList], XA_WINDOW, 32, PropModeAppend,
                     (unsigned char *) &(c->win), 1);
-    XMoveResizeWindow(dpy, c->win, c->x + 2 * sw, c->y, c->w, c->h);
+    XMoveResizeWindow(dpy, c->win, c->x + 2 * scr_width, c->y, c->w, c->h);
 
     set_client_state(c, NormalState);
 
@@ -1368,12 +1374,12 @@ void mod_mfactor (const Arg *arg) {
 }
 
 void mod_nmaster (const Arg* arg) {
-    selmon->nmasters[selmon->current_tag] = _MAX(selmon->nmasters[selmon->current_tag] + arg->i, 0);
+    selmon->nmasters[selmon->current_tag] = MAX(selmon->nmasters[selmon->current_tag] + arg->i, 0);
     arrange(selmon);
 }
 
 void mod_padding (const Arg* arg) {
-    selmon->padding[selmon->current_tag] = _MAX(selmon->padding[selmon->current_tag] + arg->i, 0);
+    selmon->padding[selmon->current_tag] = MAX(selmon->padding[selmon->current_tag] + arg->i, 0);
     arrange(selmon);
 }
 
@@ -1715,8 +1721,8 @@ void resize_mouse (const Arg *arg) {
             handler[ev.type](&ev);
             break;
         case MotionNotify:
-            nw = _MAX(ev.xmotion.x - ocx - (2 * c->bw) + 1, 1);
-            nh = _MAX(ev.xmotion.y - ocy - (2 * c->bw) + 1, 1);
+            nw = MAX(ev.xmotion.x - ocx - (2 * c->bw) + 1, 1);
+            nh = MAX(ev.xmotion.y - ocy - (2 * c->bw) + 1, 1);
 
             if (c->mon->wx + nw >= selmon->wx && c->mon->wx + nw <= selmon->wx + selmon->ww
             && c->mon->wy + nh >= selmon->wy && c->mon->wy + nh <= selmon->wy + selmon->wh)
@@ -1776,8 +1782,6 @@ void restack (Monitor *m) {
 
 void run (void) {
     XSync(dpy, false);
-
-    // loft is "sorta running"
 
     loftenv.running = true;
 
@@ -1968,19 +1972,23 @@ bool set_strut (Monitor *m, int pos, int px) {
 void setup (void) {
     XSetWindowAttributes wa;
 
-    /* clean up any zombies immediately */
     sig_child(0);
 
-    /* init screen */
     screen = loftenv.screen;
     root = loftenv.root;
 
-    sw = DisplayWidth(dpy, screen);
-    sh = DisplayHeight(dpy, screen);
+    scr_width = DisplayWidth(dpy, screen);
+    scr_height = DisplayHeight(dpy, screen);
 
     update_geom();
+    update_bars();
 
-    /* init atoms */
+    if (multimon) {
+        update_mon_indicators();
+        update_bar_mon_selections();
+    }
+
+    update_status();
 
     wmatom[WMProtocols] = XInternAtom(dpy, "WM_PROTOCOLS", false);
     wmatom[WMDelete] = XInternAtom(dpy, "WM_DELETE_WINDOW", false);
@@ -1996,34 +2004,17 @@ void setup (void) {
     netatom[NetWMWindowTypeDialog] = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE_DIALOG", false);
     netatom[NetClientList] = XInternAtom(dpy, "_NET_CLIENT_LIST", false);
 
-    /* init cursors */
-
     cursor[CurNormal] = XCreateFontCursor(dpy, XC_left_ptr);
     cursor[CurResize] = XCreateFontCursor(dpy, XC_sizing);
     cursor[CurMove] = XCreateFontCursor(dpy, XC_fleur);
-
-    /* init bar stuff */
-
-    update_bars();
-    update_mon_indicators();
-    update_bar_mon_selections();
-    update_status();
-
-    printf("done init\n");
-
-    /* init border colors */
 
     border_normal = get_color(normal_border_color);
     border_selected = get_color(selected_border_color);
     border_urgent = get_color(urgent_border_color);
 
-    // EWMH support per view
-
     XChangeProperty(dpy, root, netatom[NetSupported], XA_ATOM, 32,
             PropModeReplace, (unsigned char *) netatom, NetLast);
     XDeleteProperty(dpy, root, netatom[NetClientList]);
-
-    // select events
 
     wa.cursor = cursor[CurNormal];
     wa.event_mask = SubstructureRedirectMask|SubstructureNotifyMask|ButtonPressMask
@@ -2789,10 +2780,10 @@ bool update_geom (void) {
         if (mons == NULL)
             mons = create_mon();
 
-        if (mons->mw != sw || mons->mh != sh) {
+        if (mons->mw != scr_width || mons->mh != scr_height) {
             dirty = true;
-            mons->mw = mons->ww = sw;
-            mons->mh = mons->wh = sh;
+            mons->mw = mons->ww = scr_width;
+            mons->mh = mons->wh = scr_height;
             update_struts(mons);
         }
     }
@@ -2801,6 +2792,8 @@ bool update_geom (void) {
         selmon = mons;
         selmon = win_to_mon(root);
     }
+
+    multimon = mons->next != NULL;
 
     return dirty;
 }
