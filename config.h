@@ -113,7 +113,7 @@ static Rule rules[] = {
 //
 // ARGUMENTS: class, instance, title, tag mask, isfloating, monitor
 //
-    { "Roxterm", NULL, NULL, TAG(1) | TAG(3), false, -1 },
+    { "Roxterm", NULL, NULL, 0, false, -1 },
     { "Gimp", NULL, NULL, 0, true, -1 },
     { "Pavucontrol", NULL, NULL, 0, true, -1 },
     { "Pulseaudio-equalizer.py", NULL, NULL, 0, true, -1 },
