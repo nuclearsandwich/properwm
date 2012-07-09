@@ -91,8 +91,8 @@ static Layout layouts[] = {
 
 static const char* dmenucmd[] = {
     "dmenu_run", "-b", "-fn", "-*-terminus-medium-*-*-*-16-*-*-*-*-*-*-*",
-    "-nb", "#000000", "-nf", "#666666",
-    "-sb", "#252525", "-sf", "#AAAAAA",
+    "-nb", "#000000", "-nf", "#808080",
+    "-sb", "#000000", "-sf", "#BFBFBF",
     NULL
 };
 
@@ -114,7 +114,6 @@ static Rule rules[] = {
 // ARGUMENTS: class, instance, title, tag mask, isfloating, monitor
 //
     { "Roxterm", NULL, NULL, 0, false, -1 },
-    { "Gimp", NULL, NULL, 0, true, -1 },
     { "Pavucontrol", NULL, NULL, 0, true, -1 },
     { "Pulseaudio-equalizer.py", NULL, NULL, 0, true, -1 },
 };
