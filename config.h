@@ -173,7 +173,7 @@ static Key keys[] = {
 //
 // BUTTONS
 //
-// click can be ClkLtSymbol, ClkStatusText, ClkWinTitle, ClkClientWin, or ClkRootWin
+// click: ClickLayout, ClickStatus, ClickTitle, ClickWindow, ClickRoot
 //
 
 static Button buttons[] = {
