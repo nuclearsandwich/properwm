@@ -515,7 +515,6 @@ void _draw_selection_indicator (SelectionIndicator* si) {
         fg = &si->style.normal.fg;
     }
 
-
     loft_cairo_set_rgba(cr, bg);
     cairo_rectangle(cr, 0, 0, si->base.width, si->base.height);
     cairo_fill(cr);
@@ -661,13 +660,11 @@ void arrange_mon (Monitor *m) {
     if (smart_borders)
         update_borders(m);
 
-    if (m->selected == NULL) {
-        // reset monocle symbol override
-        if (m->layouts[m->current_tag]->arrange == monocle)
-            update_bar_layout(m);
+    if (m->layouts[m->current_tag]->arrange != monocle || m->selected == NULL)
+        update_bar_layout(m);
 
+    if (m->selected == NULL)
         return;
-    }
 
     if (m->layouts[m->current_tag]->arrange != NULL)
         m->layouts[m->current_tag]->arrange(m);
@@ -2071,7 +2068,7 @@ void setup (void) {
 }
 
 void show_hide (Client* c) {
-    for (; c != NULL; c = c->next) {
+    for (; c != NULL; c = c->snext) {
         if (ISVISIBLE(c)) {
             XMoveWindow(dpy, c->win, c->x, c->y);
 
@@ -2423,7 +2420,6 @@ void toggle_view (const Arg* arg) {
 
                 if (mask & newtagset) {
                     selmon->current_tag = i;
-                    update_bar_layout(selmon);
                     break;
                 }
             }
@@ -3037,7 +3033,6 @@ void view (const Arg *arg) {
         selmon->previous_tag = oldcur;
     }
 
-    update_bar_layout(selmon);
     focus(selmon->tagfocus[selmon->current_tag]);
     arrange(selmon);
 }
