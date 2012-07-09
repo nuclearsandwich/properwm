@@ -1979,7 +1979,6 @@ void set_layout (const Arg* arg) {
     else
         selmon->ltsymbol[0] = '\0';
 
-    update_bar_layout(selmon);
     arrange(selmon);
 }
 
