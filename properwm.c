@@ -170,7 +170,6 @@ typedef struct TagLabel {
     int num;
 
     bool current;
-    bool has_sel;
     bool selected;
     bool unused;
     bool urgent;
@@ -216,7 +215,7 @@ void destroy_notify (XEvent* e);
 void detach (Client* c);
 void detach_stack (Client* c);
 void die (const char* errstr, ...);
-Monitor* dirtomon (int dir);
+Monitor* dir_to_mon (int dir);
 void enter_notify (XEvent* e);
 void focus (Client* c);
 void focus_in (XEvent* e);
@@ -477,9 +476,12 @@ void _draw_tag (TagLabel* t) {
     pango_font_description_free(font_desc);
     g_object_unref(layout);
 
-    bool multi = selmon->selected != NULL && selmon->selected->tags != 1 << t->num;
+    int mask = (1 << t->num);
 
-    if (client_indicator && t->has_sel && multi) {
+//                                              selected client is on current tag and at least one other
+    bool indicate = selmon->selected != NULL && (mask & selmon->selected->tags) != 0 && selmon->selected->tags != mask;
+
+    if (client_indicators && indicate) {
         double ind_x_left = t->base.width / 4;
         double ind_x_center = t->base.width / 2;
         double ind_x_right = t->base.width - ind_x_left;
@@ -645,12 +647,12 @@ bool apply_size_hints (Client *c, int *x, int *y, int *w, int *h, bool interact)
 
 void arrange (Monitor *m) {
     if (m) {
-        show_hide(m->clients);
+        show_hide(m->stack);
         arrange_mon(m);
         restack(m);
     }
     else for (m = mons; m != NULL; m = m->next) {
-        show_hide(m->clients);
+        show_hide(m->stack);
         arrange_mon(m);
     }
 }
@@ -659,8 +661,13 @@ void arrange_mon (Monitor *m) {
     if (smart_borders)
         update_borders(m);
 
-    if (m->layouts[m->current_tag]->arrange != monocle || m->selected == NULL)
-        update_bar_layout(m);
+    if (m->selected == NULL) {
+        // reset monocle symbol override
+        if (m->layouts[m->current_tag]->arrange == monocle)
+            update_bar_layout(m);
+
+        return;
+    }
 
     if (m->layouts[m->current_tag]->arrange != NULL)
         m->layouts[m->current_tag]->arrange(m);
@@ -681,8 +688,6 @@ void attach_stack (Client *c) {
 
 void button_press (XEvent *e) {
     XButtonPressedEvent* ev = &e->xbutton;
-
-    /* focus monitor if necessary */
 
     Monitor* m = win_to_mon(ev->window);
 
@@ -993,7 +998,7 @@ void die (const char *errstr, ...) {
     exit(EXIT_FAILURE);
 }
 
-Monitor* dirtomon (int dir) {
+Monitor* dir_to_mon (int dir) {
     Monitor *m = NULL;
 
     if (dir > 0) {
@@ -1077,20 +1082,20 @@ void focus_in (XEvent* e) { /* there are some broken focus acquiring clients */
 }
 
 void focus_mon (const Arg* arg) {
-    Monitor* m;
-
     if (mons->next == NULL)
         return;
     
-    m = dirtomon(arg->i);
+    Monitor* m = dir_to_mon(arg->i);
+
     if (m == selmon)
         return;
 
     unfocus(selmon->selected, true);
+
     selmon = m;
+    update_bar_mon_selections();
 
     focus(selmon->tagfocus[selmon->current_tag]);
-    update_bar_mon_selections();
 }
 
 void focus_stack (const Arg* arg) {
@@ -1368,6 +1373,7 @@ void manage (Window w, XWindowAttributes *wa) {
 
     arrange(c->mon);
     XMapWindow(dpy, c->win);
+
     focus(NULL);
 }
 
@@ -1882,22 +1888,27 @@ void send_to_mon (Client* c, Monitor* m) {
     if (c->mon == m)
         return;
 
+    if (c->mon->selected == c) {
+        c->mon->selected = NULL;
+        c->mon->tagfocus[c->mon->current_tag] = NULL;
+    }
+
     unfocus(c, true);
+
     detach(c);
     detach_stack(c);
 
     c->mon = m;
-    c->tags = m->tagset[m->selected_tags]; // assign tags of target monitor
+    c->tags = 1 << m->current_tag;
 
     attach(c);
     attach_stack(c);
 
-    update_bar_tags(m);
-
     if (m->selected == NULL) {
         m->selected = c;
         m->tagfocus[m->current_tag] = c;
-        XRaiseWindow(dpy, c->win);
+
+        update_bar_tags(m);
         update_bar_title(m);
     }
 
@@ -1971,19 +1982,15 @@ void set_layout (const Arg* arg) {
     else
         selmon->ltsymbol[0] = '\0';
 
-    if (selmon->selected != NULL)
-        arrange(selmon);
-    else
-        update_bar_layout(selmon);
+    update_bar_layout(selmon);
+    arrange(selmon);
 }
 
 bool set_strut (Monitor* m, int pos, int px) {
     if (pos >= 4)
         return false;
 
-    bool iter;
-
-    iter = (m == NULL);
+    bool iter = (m == NULL);
 
     if (px <= 0)
         px = 0;
@@ -2202,10 +2209,14 @@ void stack (Monitor* m) {
 }
 
 void tag (const Arg *arg) {
-    if (selmon->selected && arg->ui & TAGMASK) {
+    if (selmon->selected != NULL && arg->ui & TAGMASK) {
         selmon->selected->tags = arg->ui & TAGMASK;
-        focus(NULL);
-        update_bar_tags(selmon);
+
+        if (ISVISIBLE(selmon->selected) == false)
+            focus(NULL);
+        else
+            update_bar_tags(selmon);
+
         arrange(selmon);
     }
 }
@@ -2214,8 +2225,7 @@ void tag_mon (const Arg *arg) {
     if (selmon->selected == NULL || mons->next == NULL)
         return;
 
-    Monitor* newmon = dirtomon(arg->i);
-    send_to_mon(selmon->selected, newmon);
+    send_to_mon(selmon->selected, dir_to_mon(arg->i));
 }
 
 void tile (Monitor *m) {
@@ -2392,39 +2402,34 @@ void toggle_tag (const Arg *arg) {
 
     if (newtags) {
         selmon->selected->tags = newtags;
-        focus(NULL);
+        focus(selmon->tagfocus[selmon->current_tag]);
         arrange(selmon);
     }
 }
 
 void toggle_view (const Arg* arg) {
-    int newtag = (arg->ui & TAGMASK);
-    unsigned int newtagset = selmon->tagset[selmon->selected_tags] ^ newtag;
+    unsigned int newtagset = selmon->tagset[selmon->selected_tags] ^ (arg->ui & TAGMASK);
 
     if (newtagset) {
-        // reset current tag if it was deselected
+        selmon->tagset[selmon->selected_tags] = newtagset;
 
+        // reset current tag if it was deselected
         if (((1 << selmon->current_tag) & newtagset) == false) {
             unsigned int i = 0;
             unsigned int mask = 1;
 
-            while (i < LENGTH(tags)) {
+            for (i = 0; i < LENGTH(tags); i++) {
                 mask = 1 << i;
-                if (mask & newtagset)
-                    break;
-                i++;
-            }
 
-            selmon->current_tag = i;
+                if (mask & newtagset) {
+                    selmon->current_tag = i;
+                    update_bar_layout(selmon);
+                    break;
+                }
+            }
         }
 
-        selmon->tagset[selmon->selected_tags] = newtagset;
-
-        if (selmon->selected == NULL)
-            focus(selmon->tagfocus[newtag]);
-        else
-            update_bar_tags(selmon);
-
+        focus(selmon->tagfocus[selmon->current_tag]);
         arrange(selmon);
     }
 }
@@ -2468,9 +2473,11 @@ void unmanage (Client* c, bool destroyed) {
     }
 
     free(c);
+
     focus(NULL);
-    update_client_list();
     arrange(m);
+
+    update_client_list();
 }
 
 void unmap_notify (XEvent* e) {
@@ -2540,7 +2547,6 @@ void update_bars (void) {
             t->current = false;
             t->unused = true;
             t->selected = false;
-            t->has_sel = false;
             t->urgent = false;
 
             // set colors
@@ -2642,8 +2648,7 @@ void update_bar_tags (Monitor* m) {
 
         t = m->bar->lb_tags + i;
         t->current = i == m->current_tag;
-        t->has_sel = m->selected != NULL && mask & m->selected->tags;
-        t->selected = mask & m->tagset[m->selected_tags];
+        t->selected = (mask & m->tagset[m->selected_tags]) != 0;
         t->urgent = false;
 
         for (c = m->clients; c != NULL; c = c->next) {
@@ -2989,7 +2994,6 @@ void update_wm_hints (Client *c) {
 
         c->isurgent = urgent;
 
-
         if (urgent) {
             if (c == selmon->selected) {
                 wmh->flags &= ~XUrgencyHint;
@@ -3033,6 +3037,7 @@ void view (const Arg *arg) {
         selmon->previous_tag = oldcur;
     }
 
+    update_bar_layout(selmon);
     focus(selmon->tagfocus[selmon->current_tag]);
     arrange(selmon);
 }
