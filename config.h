@@ -178,14 +178,14 @@ static Key keys[] = {
 
 static Button buttons[] = {
     /* click                event mask      button          function        argument */
-    { ClkLtSymbol,          0,              Button1,        set_layout,      {.v = &layouts[0]} },
-    { ClkLtSymbol,          0,              Button3,        set_layout,      {.v = &layouts[1]} },
-    { ClkLtSymbol,          MODKEY,         Button1,        set_layout,      {.v = &layouts[2]} },
-    { ClkLtSymbol,          MODKEY,         Button3,        set_layout,      {.v = &layouts[3]} },
-    { ClkStatusText,        0,              Button3,        spawn,          {.v = termcmd } },
-    { ClkWinTitle,          0,              Button1,        zoom,           {0} },
-    { ClkClientWin,         MODKEY,         Button1,        move_mouse,      {0} },
-    { ClkClientWin,         MODKEY,         Button2,        toggle_floating, {0} },
-    { ClkClientWin,         MODKEY,         Button3,        resize_mouse,    {0} },
+    { ClickLayout,          0,              Button1,        set_layout,      {.v = &layouts[0]} },
+    { ClickLayout,          0,              Button3,        set_layout,      {.v = &layouts[1]} },
+    { ClickLayout,          MODKEY,         Button1,        set_layout,      {.v = &layouts[2]} },
+    { ClickLayout,          MODKEY,         Button3,        set_layout,      {.v = &layouts[3]} },
+    { ClickStatus,        0,              Button3,        spawn,          {.v = termcmd } },
+    { ClickTitle,          0,              Button1,        zoom,           {0} },
+    { ClickWindow,         MODKEY,         Button1,        move_mouse,      {0} },
+    { ClickWindow,         MODKEY,         Button2,        toggle_floating, {0} },
+    { ClickWindow,         MODKEY,         Button3,        resize_mouse,    {0} },
 };
 
