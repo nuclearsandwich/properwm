@@ -329,8 +329,7 @@ void (*handler[LASTEvent]) (XEvent *) = {
     [ConfigureRequest] = configure_request,
     [ConfigureNotify] = configure_notify,
     [DestroyNotify] = destroy_notify,
-//    [EnterNotify] = enter_notify,
-    [FocusIn] = focus_in,
+    [EnterNotify] = enter_notify,
     [KeyPress] = key_press,
     [MappingNotify] = mapping_notify,
     [MapRequest] = map_request,
@@ -1038,8 +1037,11 @@ Monitor* dir_to_mon (int dir) {
 }
 
 void enter_notify (XEvent* e) {
-    if (click_to_focus)
+    if (click_to_focus) {
+        if (selmon->selected != NULL)
+            set_focus(selmon->selected);
         return;
+    }
 
     XCrossingEvent* ev = &e->xcrossing;
     Client* c = win_to_client(ev->window);
@@ -1086,16 +1088,6 @@ void focus (Client* c) {
     update_bar_title(selmon);
 
     update_bar_window_stat(selmon);
-}
-
-void focus_in (XEvent* e) {
-    XFocusChangeEvent* ev = &e->xfocus;
-    Client* c = win_to_client(ev->window);
-
-    if (selmon->selected != NULL && ev->window != selmon->selected->win)
-        set_focus(selmon->selected);
-    else if (c->mon != selmon)
-        unfocus(c, true);
 }
 
 void focus_mon (const Arg* arg) {
@@ -1924,6 +1916,7 @@ void send_to_mon (Client* c, Monitor* m) {
     }
 
     restack(m);
+    update_bar_window_stat(m);
 
     focus(NULL);
     arrange(NULL);
@@ -2073,8 +2066,11 @@ void setup (void) {
     XDeleteProperty(dpy, root, netatom[NetClientList]);
 
     wa.cursor = cursor[CursorNormal];
-    wa.event_mask = SubstructureRedirectMask|SubstructureNotifyMask|ButtonPressMask
-                    |EnterWindowMask|LeaveWindowMask|StructureNotifyMask|PropertyChangeMask;
+    wa.event_mask = ButtonPressMask |
+                    EnterWindowMask | LeaveWindowMask |
+                    PropertyChangeMask |
+                    StructureNotifyMask |
+                    SubstructureNotifyMask | SubstructureRedirectMask;
 
     XChangeWindowAttributes(dpy, root, CWEventMask|CWCursor, &wa);
     XSelectInput(dpy, root, wa.event_mask);
