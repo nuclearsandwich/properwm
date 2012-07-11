@@ -1029,7 +1029,7 @@ Monitor* dir_to_mon (int dir) {
             m = mons;
     }
     else if (selmon == mons)
-        for (m = mons; m->next != NULL; m = m->next); // last monitor
+        for (m = mons; m->next != NULL; m = m->next);
     else
         for (m = mons; m->next != selmon; m = m->next);
 
@@ -1037,11 +1037,8 @@ Monitor* dir_to_mon (int dir) {
 }
 
 void enter_notify (XEvent* e) {
-    if (click_to_focus) {
-        if (selmon->selected != NULL)
-            set_focus(selmon->selected);
+    if (click_to_focus)
         return;
-    }
 
     XCrossingEvent* ev = &e->xcrossing;
     Client* c = win_to_client(ev->window);
@@ -1077,7 +1074,7 @@ void focus (Client* c) {
         set_focus(c);
     }
     else {
-        XSetInputFocus(dpy, root, RevertToPointerRoot, CurrentTime);
+        XSetInputFocus(dpy, root, RevertToNone, CurrentTime);
         XDeleteProperty(dpy, root, netatom[NetActiveWindow]);
     }
 
@@ -1236,14 +1233,14 @@ void grab_buttons (Client* c, bool focused) {
                         XGrabButton(dpy, buttons[i].button,
                                     buttons[i].mask | modifiers[j],
                                     c->win, false, BUTTONMASK,
-                                    GrabModeSync, GrabModeSync, None, None);
+                                    GrabModeAsync, GrabModeAsync, None, None);
                     }
                 }
             }
         }
         else
             XGrabButton(dpy, AnyButton, AnyModifier, c->win, false,
-                        BUTTONMASK, GrabModeSync, GrabModeSync, None, None);
+                        BUTTONMASK, GrabModeAsync, GrabModeAsync, None, None);
     }
 }
 
@@ -1931,7 +1928,7 @@ void set_client_state (Client* c, long state) {
 
 void set_focus (Client* c) {
     if (c->neverfocus == false) {
-        XSetInputFocus(dpy, c->win, RevertToPointerRoot, CurrentTime);
+        XSetInputFocus(dpy, c->win, RevertToNone, CurrentTime);
         XChangeProperty(dpy, root, netatom[NetActiveWindow],
                          XA_WINDOW, 32, PropModeReplace,
                          (unsigned char *) &(c->win), 1);
@@ -2451,7 +2448,7 @@ void unfocus (Client* c, bool setfocus) {
     XSetWindowBorder(dpy, c->win, border_normal);
 
     if (setfocus) {
-        XSetInputFocus(dpy, root, RevertToPointerRoot, CurrentTime);
+        XSetInputFocus(dpy, root, RevertToNone, CurrentTime);
         XDeleteProperty(dpy, root, netatom[NetActiveWindow]);
     }
 }
