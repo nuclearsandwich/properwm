@@ -7,11 +7,6 @@ enum {
     BOTTOM
 };
 
-enum {
-    ALWAYS,
-    IF_FLOATING
-};
-
 static const char font_name[] =     "Droid Sans";
 static const int font_size =        11;
 static const int bar_height =       26;
