@@ -38,8 +38,6 @@
 
 #define BUTTONMASK              (ButtonPressMask|ButtonReleaseMask)
 #define CLEANMASK(mask)         (mask & ~(numlockmask|LockMask) & (ShiftMask|ControlMask|Mod1Mask|Mod2Mask|Mod3Mask|Mod4Mask|Mod5Mask))
-#define INTERSECT(x,y,w,h,m)    (MAX(0, MIN((x)+(w),(m)->wx+(m)->ww) - MAX((x),(m)->wx)) \
-                               * MAX(0, MIN((y)+(h),(m)->wy+(m)->wh) - MAX((y),(m)->wy)))
 #define ISVISIBLE(C)            (((C)->tags & (C)->mon->tagset[(C)->mon->selected_tags]))
 #define MOUSEMASK               (BUTTONMASK|PointerMotionMask)
 
@@ -193,6 +191,7 @@ void attach (Client* c);
 void attach_stack (Client* c);
 void button_press (XEvent* e);
 void check_other_wm (void);
+void clean_tag_focus (Monitor* m, Client* c);
 void cleanup (void);
 void clear_urgent (Client* c);
 void client_message (XEvent* e);
@@ -237,7 +236,6 @@ void property_notify (XEvent* e);
 void push_down (const Arg* arg);
 void push_up (const Arg* arg);
 void quit (const Arg* arg);
-Monitor* rect_to_mon (int x, int y, int w, int h);
 void reset_nmaster (const Arg* arg);
 void resize (Client* c, int x, int y, int w, int h, bool interact);
 void resize_client (Client* c, int x, int y, int w, int h);
@@ -290,6 +288,7 @@ Monitor* win_to_mon (Window w);
 int xerror (Display* dpy, XErrorEvent* ee);
 int xerror_dummy (Display* dpy, XErrorEvent* ee);
 int xerror_start (Display* dpy, XErrorEvent* ee);
+Monitor* xy_to_mon (int x, int y);
 void zoom (const Arg* arg);
 
 
@@ -386,7 +385,7 @@ struct Monitor {
     float mfactors[LENGTH(tags)];
     int nmasters[LENGTH(tags)];
     int padding[LENGTH(tags)];
-    Client* tagfocus[LENGTH(tags)];
+    Client* tag_focus[LENGTH(tags)];
 
     int struts[4];
     char ltsymbol[16];
@@ -692,20 +691,24 @@ void attach_stack (Client* c) {
 void button_press (XEvent* e) {
     XButtonPressedEvent* ev = &e->xbutton;
 
+    Client* c = win_to_client(ev->window);
     Monitor* m = win_to_mon(ev->window);
 
     if (m != NULL && m != selmon) {
         unfocus(selmon->selected, true);
         selmon = m;
-        focus(NULL);
+
+        if (c == NULL)
+            focus(m->tag_focus[m->current_tag]);
+
         update_bar_mon_selections();
     }
 
     int click = ClickRoot;
-    Client* c = win_to_client(ev->window);
 
     if (c != NULL) {
         focus(c);
+        restack(selmon);
         click = ClickWindow;
     }
     else if (ev->window == selmon->bar->lb_layout.base.xwin)
@@ -729,6 +732,14 @@ void check_other_wm (void) {
     XSync(dpy, false);
     XSetErrorHandler(xerror);
     XSync(dpy, false);
+}
+
+void clean_tag_focus (Monitor* m, Client* c) {
+    int i;
+    for (i = 0; i < LENGTH(tags); i++) {
+        if (m->tag_focus[i] == c)
+            m->tag_focus[i] = NULL;
+    }
 }
 
 void cleanup (void) {
@@ -916,7 +927,7 @@ Monitor* create_mon (void) {
         m->mfactors[i] = mfactors_init[i];
         m->nmasters[i] = nmaster;
         m->padding[i] = padding_init[i];
-        m->tagfocus[i] = NULL;
+        m->tag_focus[i] = NULL;
     }
 
     for (i = 0; i < 4; i++)
@@ -967,10 +978,10 @@ void destroy_mon (Monitor* mon) {
 }
 
 void destroy_notify (XEvent* e) {
-    Client* c;
     XDestroyWindowEvent* ev = &e->xdestroywindow;
+    Client* c = win_to_client(ev->window);
 
-    if ((c = win_to_client(ev->window)))
+    if (c != NULL)
         unmanage(c, true);
 }
 
@@ -1004,15 +1015,16 @@ void die (const char* errstr, ...) {
 }
 
 Monitor* dir_to_mon (int dir) {
-    Monitor *m = NULL;
+    Monitor* m = NULL;
 
     if (dir > 0) {
-        m = selmon->next;
+        m = selmon->next; // next monitor
+
         if (m == NULL)
             m = mons;
     }
     else if (selmon == mons)
-        for (m = mons; m->next; m = m->next);
+        for (m = mons; m->next != NULL; m = m->next); // last monitor
     else
         for (m = mons; m->next != selmon; m = m->next);
 
@@ -1020,37 +1032,25 @@ Monitor* dir_to_mon (int dir) {
 }
 
 void enter_notify (XEvent* e) {
-    if (click_to_focus)
-        return;
-
-    Client* c;
-    Monitor* m;
     XCrossingEvent* ev = &e->xcrossing;
 
-    if (ev->window != root && (ev->mode != NotifyNormal || ev->detail == NotifyInferior))
+    if (click_to_focus || ev->mode != NotifyNormal)
         return;
 
-    c = win_to_client(ev->window);
-    m = c ? c->mon : win_to_mon(ev->window);
+    Client* c = win_to_client(ev->window);
 
-    if (c == NULL || c == selmon->selected)
-        return;
-
-    if (m != selmon) {
-        unfocus(selmon->selected, true);
-        selmon = m;
-        update_bar_mon_selections();
+    if (c != NULL) {
+        focus(c);
+        restack(c->mon);
     }
-
-    focus(c);
 }
 
 void focus (Client* c) {
     if (c == NULL || ISVISIBLE(c) == false)
         for (c = selmon->stack; c != NULL && ISVISIBLE(c) == false; c = c->snext);
 
-    if (selmon->selected != NULL && selmon->selected != c)
-        unfocus(selmon->selected, false);
+    if (c != NULL && c != selmon->selected)
+        unfocus(selmon->selected, true);
 
     if (c) {
         if (c->mon != selmon) {
@@ -1068,22 +1068,24 @@ void focus (Client* c) {
 
         grab_buttons(c, true);
         set_focus(c);
-    } else {
+    }
+    else {
         XSetInputFocus(dpy, root, RevertToPointerRoot, CurrentTime);
         XDeleteProperty(dpy, root, netatom[NetActiveWindow]);
     }
 
     selmon->selected = c;
-    selmon->tagfocus[selmon->current_tag] = c;
+    selmon->tag_focus[selmon->current_tag] = c;
 
     update_bar_tags(selmon);
     update_bar_title(selmon);
 }
 
-void focus_in (XEvent* e) { /* there are some broken focus acquiring clients */
+void focus_in (XEvent* e) {
     XFocusChangeEvent* ev = &e->xfocus;
+    Client* c = win_to_client(ev->window);
 
-    if (selmon->selected != NULL && ev->window != selmon->selected->win)
+    if (selmon->selected != NULL && c != selmon->selected)
         set_focus(selmon->selected);
 }
 
@@ -1096,15 +1098,15 @@ void focus_mon (const Arg* arg) {
     if (m == selmon)
         return;
 
-    Monitor* oldmon = selmon;
-
     unfocus(selmon->selected, true);
 
+    Monitor* oldmon = selmon;
     selmon = m;
-    focus(m->tagfocus[m->current_tag]);
 
     update_bar_tags(oldmon);
     update_bar_mon_selections();
+
+    focus(m->tag_focus[m->current_tag]);
 }
 
 void focus_stack (const Arg* arg) {
@@ -1547,9 +1549,9 @@ void move_mouse (const Arg* arg) {
 
     XUngrabPointer(dpy, CurrentTime);
 
-    Monitor* m = rect_to_mon(c->x, c->y, c->w, c->h);
+    Monitor* m = xy_to_mon(c->x + (c->w / 2), c->y + (c->h / 2));
 
-    if (m != selmon) {
+    if (m != NULL && m != selmon) {
         send_to_mon(c, m);
         selmon = m;
         focus(NULL);
@@ -1584,7 +1586,7 @@ int n_tiled (Monitor* m) {
     Client* c;
     int nt = 0;
 
-    for (c = next_tiled(m->clients); c; c = next_tiled(c->next)) {
+    for (c = next_tiled(m->clients); c != NULL; c = next_tiled(c->next)) {
         if (ISVISIBLE(c))
             nt++;
     }
@@ -1706,22 +1708,6 @@ void quit (const Arg* arg) {
     running = false;
 }
 
-Monitor* rect_to_mon (int x, int y, int w, int h) {
-    int a, area = 0;
-
-    Monitor* m;
-    Monitor* r = selmon;
-
-    for (m = mons; m; m = m->next) {
-        if ((a = INTERSECT(x, y, w, h, m)) > area) {
-            area = a;
-            r = m;
-        }
-    }
-
-    return r;
-}
-
 void reset_nmaster (const Arg* arg) {
     selmon->nmasters[selmon->current_tag] = nmaster;
     arrange(selmon);
@@ -1756,24 +1742,23 @@ void resize_client (Client* c, int x, int y, int w, int h) {
 }
 
 void resize_mouse (const Arg* arg) {
-    int ocx, ocy;
-    int nw, nh;
-    Client *c;
-    XEvent ev;
-
     if (selmon->selected == NULL)
         return;
 
     restack(selmon);
 
-    c = selmon->selected;
-    ocx = c->x;
-    ocy = c->y;
+    Client* c = selmon->selected;
+    int ocx = c->x;
+    int ocy = c->y;
 
     if (XGrabPointer(dpy, root, false, MOUSEMASK, GrabModeAsync, GrabModeAsync, None, cursor[CursorResize], CurrentTime) != GrabSuccess)
         return;
 
     XWarpPointer(dpy, None, c->win, 0, 0, 0, 0, c->w + c->bw - 1, c->h + c->bw - 1);
+
+    XEvent ev;
+    int nw;
+    int nh;
 
     do {
         XMaskEvent(dpy, MOUSEMASK|ExposureMask|SubstructureRedirectMask, &ev);
@@ -1806,9 +1791,9 @@ void resize_mouse (const Arg* arg) {
 
     while (XCheckMaskEvent(dpy, EnterWindowMask, &ev));
 
-    Monitor* m = rect_to_mon(c->x, c->y, c->w, c->h);
+    Monitor* m = xy_to_mon(c->x + (c->w / 2), c->y + (c->h / 2));
 
-    if (m != selmon) {
+    if (m != NULL && m != selmon) {
         send_to_mon(c, m);
         selmon = m;
         focus(NULL);
@@ -1824,8 +1809,7 @@ void restack (Monitor* m) {
     if (m->selected == NULL)
         return;
 
-    if (m->selected->isfloating || m->layouts[m->current_tag]->arrange == NULL)
-        XRaiseWindow(dpy, m->selected->win);
+    XRaiseWindow(dpy, m->selected->win);
 
     if (m->layouts[m->current_tag]->arrange != NULL) {
         wc.stack_mode = Below;
@@ -1911,19 +1895,19 @@ void send_to_mon (Client* c, Monitor* m) {
     if (c->mon == m)
         return;
 
+    clean_tag_focus(c->mon, c);
+
     if (c->mon->selected == c)
         c->mon->selected = NULL;
-
-    int i;
-    for (i = 0; i < LENGTH(tags); i++) {
-        if (c->mon->tagfocus[i] == c)
-            c->mon->tagfocus[i] = NULL;
-    }
 
     unfocus(c, true);
 
     detach(c);
     detach_stack(c);
+
+    restack(c->mon);
+
+    // - - - - - - - - - - -
 
     c->mon = m;
     c->tags = m->tagset[m->selected_tags];
@@ -1933,11 +1917,13 @@ void send_to_mon (Client* c, Monitor* m) {
 
     if (m->selected == NULL) {
         m->selected = c;
-        m->tagfocus[m->current_tag] = c;
+        m->tag_focus[m->current_tag] = c;
 
         update_bar_tags(m);
         update_bar_title(m);
     }
+
+    restack(m);
 
     focus(NULL);
     arrange(NULL);
@@ -2238,6 +2224,8 @@ void tag (const Arg* arg) {
     if (selmon->selected != NULL && arg->ui & TAGMASK) {
         selmon->selected->tags = arg->ui & TAGMASK;
 
+        // refocus if selected client was hidden
+
         if (ISVISIBLE(selmon->selected) == false)
             focus(NULL);
         else
@@ -2428,7 +2416,7 @@ void toggle_tag (const Arg* arg) {
 
     if (newtags) {
         selmon->selected->tags = newtags;
-        focus(selmon->tagfocus[selmon->current_tag]);
+        focus(selmon->tag_focus[selmon->current_tag]);
         arrange(selmon);
     }
 }
@@ -2454,7 +2442,7 @@ void toggle_view (const Arg* arg) {
             }
         }
 
-        focus(selmon->tagfocus[selmon->current_tag]);
+        focus(selmon->tag_focus[selmon->current_tag]);
         arrange(selmon);
     }
 }
@@ -2476,14 +2464,10 @@ void unmanage (Client* c, bool destroyed) {
     Monitor* m = c->mon;
     XWindowChanges wc;
 
-    int i;
-    for (i = 0; i < LENGTH(tags); i++) {
-        if (m->tagfocus[i] == c)
-            m->tagfocus[i] = NULL;
-    }
-
     detach(c);
     detach_stack(c);
+
+    clean_tag_focus(c->mon, c);
 
     if (destroyed == false) {
         wc.border_width = c->oldbw;
@@ -2498,7 +2482,13 @@ void unmanage (Client* c, bool destroyed) {
     }
 
     free(c);
-    focus(NULL);
+
+    if (m != selmon) {
+        update_bar_tags(m);
+        update_bar_title(m);
+    } else 
+        focus(NULL);
+
     update_client_list();
     arrange(m);
 }
@@ -3058,7 +3048,7 @@ void view (const Arg* arg) {
         selmon->previous_tag = oldcur;
     }
 
-    focus(selmon->tagfocus[selmon->current_tag]);
+    focus(selmon->tag_focus[selmon->current_tag]);
     arrange(selmon);
 }
 
@@ -3080,7 +3070,7 @@ Monitor* win_to_mon (Window w) {
     Monitor* m;
 
     if (w == root && get_root_ptr(&x, &y))
-        return rect_to_mon(x, y, 1, 1);
+        return xy_to_mon(x, y);
 
     LoftWidget* lw;
 
@@ -3125,6 +3115,17 @@ int xerror_dummy (Display* dpy, XErrorEvent* ee) {
 int xerror_start (Display* dpy, XErrorEvent* ee) {
     die("properwm: another window manager is already running\n");
     return -1;
+}
+
+Monitor* xy_to_mon (int x, int y) {
+    Monitor* m;
+
+    for (m = mons; m; m = m->next) {
+        if (x >= m->mx && x <= m->mx + m->mw && y >= m->my && y <= m->my + m->mh)
+            return m;
+    }
+
+    return NULL;
 }
 
 void zoom (const Arg* arg) {
