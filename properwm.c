@@ -1894,8 +1894,6 @@ void send_to_mon (Client* c, Monitor* m) {
     detach(c);
     detach_stack(c);
 
-    restack(c->mon);
-
     // - - - - - - - - - - -
 
     c->mon = m;
@@ -1912,10 +1910,9 @@ void send_to_mon (Client* c, Monitor* m) {
         update_bar_title(m);
     }
 
-    restack(m);
-    update_bar_window_stat(m);
+    update_bar_window_stat(m); // update window stat of target monitor
 
-    focus(NULL);
+    focus(NULL); // triggers update of tags,layout,title,stat
     arrange(NULL);
 }
 
