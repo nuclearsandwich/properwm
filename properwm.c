@@ -85,7 +85,8 @@ enum {
 typedef struct Monitor Monitor;
 typedef struct Client Client;
 
-typedef void (ArrangeFunc) (Monitor *);
+typedef void (ArrangeFunc) (Monitor*);
+typedef void (SymbolOverrideFunc) (Monitor*);
 
 typedef union {
     int i;
@@ -94,13 +95,13 @@ typedef union {
     const void *v;
 } Arg;
 
-typedef void (BindingFunc) (const Arg*);
+typedef void (UserFunc) (const Arg*);
 
 typedef struct {
     unsigned int click;
     unsigned int mask;
     unsigned int button;
-    BindingFunc* func;
+    UserFunc* func;
     const Arg arg;
 } Button;
 
@@ -122,13 +123,14 @@ typedef struct Client {
 typedef struct {
     unsigned int mod;
     KeySym keysym;
-    BindingFunc* func;
+    UserFunc* func;
     const Arg arg;
 } Key;
 
 typedef struct {
     const char *symbol;
     ArrangeFunc* arrange;
+    SymbolOverrideFunc* symbol_override;
 } Layout;
 
 typedef struct {
@@ -269,6 +271,7 @@ void unmap_notify (XEvent *e);
 void update_bars (void);
 void update_bar_layout (Monitor* m);
 void update_bar_mon_selections (void);
+void update_bar_selection_stat (Monitor* m);
 void update_bar_tags (Monitor* m);
 void update_bar_title (Monitor* m);
 void update_borders (Monitor* m);
@@ -328,7 +331,7 @@ void (*handler[LASTEvent]) (XEvent *) = {
     [ConfigureRequest] = configure_request,
     [ConfigureNotify] = configure_notify,
     [DestroyNotify] = destroy_notify,
-    [EnterNotify] = enter_notify,
+//    [EnterNotify] = enter_notify,
     [FocusIn] = focus_in,
     [KeyPress] = key_press,
     [MappingNotify] = mapping_notify,
@@ -353,6 +356,7 @@ typedef struct Bar {
     TagLabel lb_tags[LENGTH(tags)];
 
     LoftLabel lb_layout;
+    LoftLabel lb_selstat;
     LoftLabel lb_title;
     LoftLabel lb_status;
 
@@ -388,7 +392,8 @@ struct Monitor {
     Client* tag_focus[LENGTH(tags)];
 
     int struts[4];
-    char ltsymbol[16];
+    char ltsymbol[12];
+    char selstat[12];
 
     Monitor *next;
 };
@@ -671,8 +676,7 @@ void arrange_mon (Monitor* m) {
     if (smart_borders)
         update_borders(m);
 
-    if (m->layouts[m->current_tag]->arrange != monocle)
-        update_bar_layout(m);
+    update_bar_layout(m);
 
     if (m->layouts[m->current_tag]->arrange != NULL)
         m->layouts[m->current_tag]->arrange(m);
@@ -709,6 +713,7 @@ void button_press (XEvent* e) {
     if (c != NULL) {
         focus(c);
         restack(selmon);
+		XAllowEvents(dpy, ReplayPointer, CurrentTime);
         click = ClickWindow;
     }
     else if (ev->window == selmon->bar->lb_layout.base.xwin)
@@ -922,6 +927,9 @@ Monitor* create_mon (void) {
     m->bar_y = 0;
     m->show_bar = show_bar;
 
+    m->ltsymbol[0] = '\0';
+    m->selstat[0] = '\0';
+
     for (i = 0; i < LENGTH(tags); i++) {
         m->layouts[i] = &layouts[layouts_init[i]];
         m->mfactors[i] = mfactors_init[i];
@@ -1032,11 +1040,10 @@ Monitor* dir_to_mon (int dir) {
 }
 
 void enter_notify (XEvent* e) {
-    XCrossingEvent* ev = &e->xcrossing;
-
-    if (click_to_focus || ev->mode != NotifyNormal)
+    if (click_to_focus)
         return;
 
+    XCrossingEvent* ev = &e->xcrossing;
     Client* c = win_to_client(ev->window);
 
     if (c != NULL) {
@@ -1079,14 +1086,18 @@ void focus (Client* c) {
 
     update_bar_tags(selmon);
     update_bar_title(selmon);
+
+    update_bar_selection_stat(selmon);
 }
 
 void focus_in (XEvent* e) {
     XFocusChangeEvent* ev = &e->xfocus;
     Client* c = win_to_client(ev->window);
 
-    if (selmon->selected != NULL && c != selmon->selected)
+    if (selmon->selected != NULL && ev->window != selmon->selected->win)
         set_focus(selmon->selected);
+    else if (c->mon != selmon)
+        unfocus(c, true);
 }
 
 void focus_mon (const Arg* arg) {
@@ -1235,14 +1246,14 @@ void grab_buttons (Client* c, bool focused) {
                         XGrabButton(dpy, buttons[i].button,
                                     buttons[i].mask | modifiers[j],
                                     c->win, false, BUTTONMASK,
-                                    GrabModeAsync, GrabModeSync, None, None);
+                                    GrabModeSync, GrabModeSync, None, None);
                     }
                 }
             }
         }
         else
             XGrabButton(dpy, AnyButton, AnyModifier, c->win, false,
-                        BUTTONMASK, GrabModeAsync, GrabModeSync, None, None);
+                        BUTTONMASK, GrabModeSync, GrabModeSync, None, None);
     }
 }
 
@@ -1457,18 +1468,9 @@ void monocle (Monitor* m) {
     int h = m->wh - (p * 2);
 
     Client* c;
-    int n = 0;
 
-    for (c = next_tiled(m->clients); c != NULL; c = next_tiled(c->next)) {
+    for (c = next_tiled(m->clients); c != NULL; c = next_tiled(c->next))
         resize(c, x,y, w - (c->bw * 2), h - (c->bw * 2), false);
-        n++;
-    }
-
-    if (n > 0) {
-        snprintf(m->ltsymbol, 15, "%d", n);
-        REDRAW_IF_VISIBLE(&m->bar->lb_layout.base);
-    } else
-        update_bar_layout(m);
 }
 
 void move_mouse (const Arg* arg) {
@@ -2527,6 +2529,7 @@ void update_bars (void) {
         loft_window_set_layout(&m->bar->win, &m->bar->lt_main);
 
         loft_label_init(&m->bar->lb_layout, m->ltsymbol, 0);
+        loft_label_init(&m->bar->lb_selstat, m->selstat, 0);
         loft_label_init(&m->bar->lb_title, m->selected != NULL ? m->selected->name : NULL, FLOW_L);
         loft_label_init(&m->bar->lb_status, status, FLOW_R);
 
@@ -2536,16 +2539,19 @@ void update_bars (void) {
 
         m->bar->win.base.draw_base = false;
         m->bar->lb_layout.base.draw_base = false;
+        m->bar->lb_selstat.base.draw_base = false;
         m->bar->lb_title.base.draw_base = false;
         m->bar->lb_status.base.draw_base = false;
 
         loft_label_set_padding(&m->bar->lb_layout, 10,0,10,0);
+        loft_label_set_padding(&m->bar->lb_selstat, 10,0,10,0);
         loft_label_set_padding(&m->bar->lb_title, 8,0,8,0);
         loft_label_set_padding(&m->bar->lb_status, 8,0,8,0);
 
         loft_layout_attach(&m->bar->lt_main, &m->bar->lt_tagstrip.base, EXPAND_Y);
         loft_layout_attach(&m->bar->lt_main, &m->bar->lb_layout.base, EXPAND_Y);
         loft_layout_attach(&m->bar->lt_main, &m->bar->lb_title.base, EXPAND_X | EXPAND_Y);
+        loft_layout_attach(&m->bar->lt_main, &m->bar->lb_selstat.base, EXPAND_Y);
         loft_layout_attach(&m->bar->lt_main, &m->bar->lb_status.base, EXPAND_Y);
 
         for (i = 0; i < LENGTH(tags); i++) {
@@ -2604,6 +2610,9 @@ void update_bars (void) {
         loft_rgba_set_from_str(&m->bar->lb_layout.style.normal.bg, (char*) ltsym_bg_color);
         loft_rgba_set_from_str(&m->bar->lb_layout.style.normal.fg, (char*) ltsym_fg_color);
 
+        loft_rgba_set_from_str(&m->bar->lb_selstat.style.normal.bg, (char*) selstat_bg_color);
+        loft_rgba_set_from_str(&m->bar->lb_selstat.style.normal.fg, (char*) selstat_fg_color);
+
         loft_rgba_set_from_str(&m->bar->lb_title.style.normal.bg, (char*) title_bg_color);
         loft_rgba_set_from_str(&m->bar->lb_title.style.normal.fg, (char*) title_fg_color);
 
@@ -2629,8 +2638,8 @@ void update_bars (void) {
 }
 
 inline void update_bar_layout (Monitor* m) {
-    strncpy(m->ltsymbol, m->layouts[m->current_tag]->symbol, sizeof(m->ltsymbol));
-    REDRAW_IF_VISIBLE(&m->bar->lb_layout.base);
+    sprintf(m->ltsymbol, "%s", m->layouts[m->current_tag]->symbol);
+    loft_label_set_text(&m->bar->lb_layout, m->ltsymbol);
 }
 
 void update_bar_mon_selections (void) {
@@ -2638,9 +2647,35 @@ void update_bar_mon_selections (void) {
         return;
 
     Monitor* m;
+
     for (m = mons; m != NULL; m = m->next) {
         m->bar->indicator->active = selmon == m;
         REDRAW_IF_VISIBLE(&m->bar->indicator->base);
+    }
+}
+
+void update_bar_selection_stat (Monitor* m) {
+    Client* c;
+    int n = 0;
+    int sel = -1;
+
+    for (c = m->clients; c != NULL; c = c->next) {
+        if (ISVISIBLE(c) == false)
+            continue;
+
+        n++;
+
+        if (c == m->selected)
+            sel = n;
+    }
+
+    if (n > 0) {
+        sprintf(m->selstat, "%d/%d", sel, n);
+        loft_label_set_text(&m->bar->lb_selstat, m->selstat);
+        loft_widget_show(&m->bar->lb_selstat.base);
+    } else {
+        m->selstat[0] = '\0';
+        loft_widget_hide(&m->bar->lb_selstat.base);
     }
 }
 

@@ -7,19 +7,19 @@ enum {
     BOTTOM
 };
 
-static const char font_name[] =     "Droid Sans";
-static const int font_size =        11;
-static const int bar_height =       26;
+static const char font_name[] =         "Droid Sans";
+static const int font_size =            11;
+static const int bar_height =           26;
 
-static int  bar_pos =               TOP;    // bar position, TOP or BOTTOM
-static unsigned int border_width =  1;      // window border width
-static bool click_to_focus =        true;   // require click to focus windows with mouse, otherwise automatic
-static bool client_indicators =     true;   // draw indicators showing which tag(s) selected client is on
-static int nmaster =                2;      // number of windows in master tiling area
-static bool show_bar =              true;   // bar visibility
-static bool smart_borders =         true;   // only show borders if practical, ie: more than one tiled window + not using monocle layout
-static unsigned int snap =          10;     // window snap threshold
-static bool tiled_size_hints =      false;  // respect size hints for tiled windows
+static int  bar_pos =                   TOP;            // bar position, TOP or BOTTOM
+static unsigned int border_width =      1;              // window border width
+static bool click_to_focus =            true;           // require click to focus windows with mouse, otherwise automatic
+static bool client_indicators =         true;           // draw indicators showing which tag(s) selected client is on
+static int nmaster =                    2;              // number of windows in master tiling area
+static bool show_bar =                  true;           // bar visibility
+static bool smart_borders =             true;           // only show borders if practical, ie: more than one tiled window + not using monocle layout
+static unsigned int snap =              10;             // window snap threshold
+static bool tiled_size_hints =          false;          // respect size hints for tiled windows
 
 //
 // COLORS
@@ -54,6 +54,9 @@ static const char ltsym_fg_color[] = "#BFBFBF";
 static const char title_bg_color[] = "#000000CC";
 static const char title_fg_color[] = "#BFBFBF";
 
+static const char selstat_bg_color[] = "#000000CC";
+static const char selstat_fg_color[] = "#BFBFBF";
+
 static const char status_bg_color[] = "#222222CC";
 static const char status_fg_color[] = "#BFBFBF";
 
@@ -78,11 +81,11 @@ static int padding_init[] =     {    0,    0,    6,    6,    6,    6,    6,    6
 //
 
 static Layout layouts[] = {
-    /* symbol     arrange function */
-    { "M", monocle },
-    { "S", stack },
-    { "T", tile },
-    { "F", NULL },
+//    symbol    function
+    { "M",      monocle },
+    { "S",      stack },
+    { "T",      tile },
+    { "F",      NULL }
 };
 
 //
