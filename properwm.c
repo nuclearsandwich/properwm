@@ -108,6 +108,7 @@ typedef struct Client {
     char name[256];
     float mina, maxa;
     int x, y, w, h;
+    int fx, fy, fw, fh;
     int oldx, oldy, oldw, oldh;
     int basew, baseh, incw, inch, maxw, maxh, minw, minh;
     int bw, oldbw;
@@ -272,11 +273,11 @@ void update_bar_mon_selections (void);
 void update_bar_window_stat (Monitor* m);
 void update_bar_tags (Monitor* m);
 void update_bar_title (Monitor* m);
-void update_borders (Monitor* m);
 void update_client_list (void);
 bool update_geom (void);
 void update_mon_indicators (void);
 void update_numlock_mask (void);
+void update_smart_borders (Monitor* m);
 void update_size_hints (Client* c);
 void update_status (void);
 void update_struts (Monitor* m);
@@ -671,12 +672,19 @@ void arrange (Monitor* m) {
 
 void arrange_mon (Monitor* m) {
     if (smart_borders)
-        update_borders(m);
+        update_smart_borders(m);
 
     update_bar_layout(m);
 
     if (m->layouts[m->current_tag]->arrange != NULL)
         m->layouts[m->current_tag]->arrange(m);
+    else {
+        Client* c;
+        for (c = m->clients; c != NULL; c = c->next) {
+            if (ISVISIBLE(c) && c->isfullscreen == false)
+                resize(c, c->fx, c->fy, c->fw, c->fh, false);
+        }
+    }
 }
 
 void attach (Client* c) {
@@ -822,18 +830,18 @@ void configure (Client* c) {
 }
 
 void configure_notify (XEvent* e) {
-    Monitor* m;
     XConfigureEvent* ev = &e->xconfigure;
-    bool dirty;
 
     if (ev->window == root) {
-        dirty = (scr_width != ev->width);
+        bool dirty = scr_width != ev->width || scr_height != ev->height;
+
         scr_width = ev->width;
         scr_height = ev->height;
 
         if (update_geom() || dirty) {
             update_bars();
 
+            Monitor* m;
             for (m = mons; m; m = m->next) {
                 loft_widget_move(&m->bar->win.base, m->mx, m->bar_y);
                 loft_widget_resize(&m->bar->win.base, m->mw, m->mh);
@@ -855,7 +863,7 @@ void configure_request (XEvent* e) {
     if (c != NULL) {
         if (ev->value_mask & CWBorderWidth)
             c->bw = ev->border_width;
-        else if (c->isfloating || !selmon->layouts[selmon->current_tag]->arrange) {
+        else if (c->isfloating || selmon->layouts[selmon->current_tag]->arrange == NULL) {
             m = c->mon;
 
             if (ev->value_mask & CWX) {
@@ -885,8 +893,7 @@ void configure_request (XEvent* e) {
 
             if (ISVISIBLE(c))
                 XMoveResizeWindow(dpy, c->win, c->x, c->y, c->w, c->h);
-        }
-        else
+        } else
             configure(c);
     }
     else {
@@ -1323,7 +1330,7 @@ void manage (Window w, XWindowAttributes* wa) {
     Client* c = malloc(sizeof(Client));
 
     if (c == NULL)
-        die("out of memory\n", sizeof(Client));
+        die("out of memory\n");
 
     c->win = w;
     update_title(c);
@@ -1340,23 +1347,33 @@ void manage (Window w, XWindowAttributes* wa) {
         apply_rules(c);
     }
 
+    c->oldbw = wa->border_width;
+
     c->x = c->oldx = wa->x;
     c->y = c->oldy = wa->y;
     c->w = c->oldw = wa->width;
     c->h = c->oldh = wa->height;
-    c->oldbw = wa->border_width;
+
+    c->fx = c->x;
+    c->fy = c->y;
+    c->fw = c->w;
+    c->fh = c->h;
+
+    // make sure window is entirely visible
 
     if (c->x + WIDTH(c) > c->mon->mx + c->mon->mw)
         c->x = c->mon->mx + c->mon->mw - WIDTH(c);
     if (c->y + HEIGHT(c) > c->mon->my + c->mon->mh)
         c->y = c->mon->my + c->mon->mh - HEIGHT(c);
 
-    c->x = MAX(c->x, c->mon->mx);
+    // fix y position if it's covering the bar
 
-    // only fix y offset if the client center might cover the bar
-
-    c->y = MAX(c->y, ((c->mon->bar_y == c->mon->my) && (c->x + (c->w / 2) >= c->mon->wx)
-               && (c->x + (c->w / 2) < c->mon->wx + c->mon->ww)) ? bar_height : c->mon->my);
+    if (c->mon->show_bar) {
+        if (c->mon->bar_pos == TOP && c->y <= c->mon->bar_y + bar_height)
+            c->y = c->mon->wy;
+        else if (c->y + HEIGHT(c) >= c->mon->bar_y)
+            c->y = c->mon->bar_y - 1 - HEIGHT(c);
+    }
 
     update_window_type(c);
     update_size_hints(c);
@@ -1399,7 +1416,6 @@ void manage (Window w, XWindowAttributes* wa) {
 
     arrange(c->mon);
     XMapWindow(dpy, c->win);
-
     focus(NULL);
 }
 
@@ -1523,13 +1539,21 @@ void move_mouse (const Arg* arg) {
             if (c->isfloating == false && selmon->layouts[selmon->current_tag]->arrange != NULL &&
                 (ev.xmotion.x < x - snap || ev.xmotion.x > x + snap || ev.xmotion.y < y - snap || ev.xmotion.y > y + snap))
             {
+                c->fx = c->x;
+                c->fy = c->y;
+                c->fw = c->w;
+                c->fh = c->h;
                 toggle_floating(NULL);
             }
 
             if (c->isfloating || selmon->layouts[selmon->current_tag]->arrange == NULL) {
                 if (c->isfullscreen)
                     set_fullscreen(c, false);
+
                 resize(c, nx, ny, c->w, c->h, true);
+
+                c->fx = c->x;
+                c->fy = c->y;
             }
 
             break;
@@ -1762,18 +1786,30 @@ void resize_mouse (const Arg* arg) {
             nh = MAX(ev.xmotion.y - ocy - (2 * c->bw) + 1, 1);
 
             if (c->mon->wx + nw >= selmon->wx && c->mon->wy + nh >= selmon->wy) {
-                if (c->isfloating == false && selmon->layouts[selmon->current_tag]->arrange != NULL && (abs(nw - c->w) > snap || abs(nh - c->h) > snap))
+                if (c->isfloating == false && selmon->layouts[selmon->current_tag]->arrange != NULL &&
+                    (abs(nw - c->w) > snap || abs(nh - c->h) > snap))
+                {
+                    c->fx = c->x;
+                    c->fy = c->y;
+                    c->fw = c->w;
+                    c->fh = c->h;
                     toggle_floating(NULL);
+                }
             }
 
             if (selmon->layouts[selmon->current_tag]->arrange == false || c->isfloating) {
                 if (c->isfullscreen)
                     set_fullscreen(c, false);
+
                 resize(c, c->x, c->y, nw, nh, true);
+
+                c->fw = c->w;
+                c->fh = c->h;
             }
+
             break;
         }
-    } while(ev.type != ButtonRelease);
+    } while (ev.type != ButtonRelease);
 
     XWarpPointer(dpy, None, c->win, 0, 0, 0, 0, c->w + c->bw - 1, c->h + c->bw - 1);
     XUngrabPointer(dpy, CurrentTime);
@@ -1798,7 +1834,8 @@ void restack (Monitor* m) {
     if (m->selected == NULL)
         return;
 
-    XRaiseWindow(dpy, m->selected->win);
+    if (m->selected->isfloating)
+        XRaiseWindow(dpy, m->selected->win);
 
     if (m->layouts[m->current_tag]->arrange != NULL) {
         wc.stack_mode = Below;
@@ -1945,7 +1982,7 @@ void set_fullscreen (Client* c, bool fullscreen) {
         c->oldstate = c->isfloating;
 
         if (smart_borders)
-            update_borders(c->mon);
+            update_smart_borders(c->mon);
 
         resize(c, c->mon->mx, c->mon->my, c->mon->mw, c->mon->mh, false);
         XRaiseWindow(dpy, c->win);
@@ -2076,9 +2113,6 @@ void show_hide (Client* c) {
     for (; c != NULL; c = c->snext) {
         if (ISVISIBLE(c)) {
             XMoveWindow(dpy, c->win, c->x, c->y);
-
-            if ((c->mon->layouts[c->mon->current_tag]->arrange == NULL || c->isfloating) && c->isfullscreen == false)
-                resize(c, c->x, c->y, c->w, c->h, false);
         } else
             XMoveWindow(dpy, c->win, WIDTH(c) * -2, c->y);
     }
@@ -2368,30 +2402,25 @@ void toggle_bar_pos (const Arg* arg) {
 }
 
 void toggle_floating (const Arg* arg) {
-    if (selmon->selected == NULL)
+    if (selmon->selected == NULL || selmon->layouts[selmon->current_tag] == NULL)
         return;
 
-    selmon->selected->isfloating = selmon->selected->isfloating == false || selmon->selected->isfixed;
+    Client* sel = selmon->selected;
 
-    int oldw;
-    int oldh;
+    sel->isfloating = sel->isfloating == false || sel->isfixed;
 
-    if (selmon->selected->isfloating && selmon->selected->bw == 0) {
-        oldw = WIDTH(selmon->selected);
-        oldh = HEIGHT(selmon->selected);
+    if (sel->isfloating) {
+        if (sel->bw == 0)
+            sel->bw = border_width;
 
-        selmon->selected->bw = border_width;
+        if (sel->w == sel->fw && sel->h == sel->fh)
+            XResizeWindow(dpy, sel->win, sel->w * 2, sel->h * 2);
 
-        resize(selmon->selected, selmon->selected->x, selmon->selected->y, oldw, oldh, false);
-
-        if (WIDTH(selmon->selected) > oldw && HEIGHT(selmon->selected) > oldh)
-            resize(selmon->selected, selmon->selected->x, selmon->selected->y, oldw - (2 * border_width), oldh - (2 * border_width), false);
-
-        if (WIDTH(selmon->selected) < oldw && HEIGHT(selmon->selected) < oldh)
-            resize(selmon->selected, selmon->selected->x, selmon->selected->y, oldw, oldh, false);
+        resize(sel, sel->fx, sel->fy, sel->fw, sel->fh, false);
+        XRaiseWindow(dpy, sel->win);
     }
-    else if (selmon->selected->isfullscreen)
-        set_fullscreen(selmon->selected, false);
+    else if (sel->isfullscreen)
+        set_fullscreen(sel, false);
 
     arrange(selmon);
 }
@@ -2705,54 +2734,6 @@ inline void update_bar_title (Monitor* m) {
     loft_label_set_text(&m->bar->lb_title, m->selected != NULL ? m->selected->name : NULL);
 }
 
-void update_borders (Monitor* m) {
-    Client* c;
-
-    int oldw;
-    int oldh;
-
-    if (m->layouts[m->current_tag]->arrange == NULL) {
-        for (c = next_tiled(m->clients); c; c = next_tiled(c->next)) {
-            if (c->bw == 0) {
-                oldw = WIDTH(c);
-                oldh = HEIGHT(c);
-
-                c->bw = border_width;
-
-                resize(c, c->x, c->y, oldw, oldh, false);
-
-                if (WIDTH(c) > oldw && HEIGHT(c) > oldh)
-                    resize(c, c->x, c->y, oldw - (c->bw * 2), oldh - (c->bw * 2), false);
-
-                if (WIDTH(c) < oldw && HEIGHT(c) < oldh)
-                    resize(c, c->x, c->y, oldw, oldh, false);
-            }
-        }
-        return;
-    }
-
-    int bdr;
-
-    if (m->layouts[m->current_tag]->arrange == &monocle || n_tiled(m) == 1)
-        bdr = 0;
-    else
-        bdr = border_width;
-
-    for (c = next_tiled(m->clients); c; c = next_tiled(c->next)) {
-        if (ISVISIBLE(c) == false)
-            continue;
-
-        if (c->bw != bdr) {
-            oldw = WIDTH(c);
-            oldh = HEIGHT(c);
-
-            c->bw = bdr;
-
-            resize(c, c->x, c->y, oldw, oldh, false);
-        }
-    }
-}
-
 void update_client_list (void) {
     Client *c;
     Monitor *m;
@@ -2908,6 +2889,35 @@ void update_numlock_mask (void) {
     }
 
     XFreeModifiermap(modmap);
+}
+
+void update_smart_borders (Monitor* m) {
+    Client* c;
+
+    if (m->layouts[m->current_tag]->arrange == NULL) {
+        for (c = m->clients; c != NULL; c = c->next) {
+            if (ISVISIBLE(c) && c->bw == 0) {
+                c->bw = border_width;
+                configure(c);
+            }
+        }
+        return;
+    }
+
+    int bw;
+
+    if (m->layouts[m->current_tag]->arrange == &monocle || n_tiled(m) == 1)
+        bw = 0;
+    else
+        bw = border_width;
+
+    for (c = next_tiled(m->clients); c != NULL; c = next_tiled(c->next)) {
+        if (ISVISIBLE(c) && c->bw != bw) {
+            c->bw = bw;
+            configure(c);
+            XMoveResizeWindow(dpy, c->win, c->x, c->y, c->w * 2, c->h * 2); // fuck you, xlib
+        }
+    }
 }
 
 void update_size_hints (Client* c) {
