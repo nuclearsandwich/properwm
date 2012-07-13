@@ -383,7 +383,7 @@ struct Monitor {
     int bar_y;
     bool show_bar;
 
-    const Layout *layouts[LENGTH(tags)];
+    const Layout* layouts[LENGTH(tags)];
     float mfactors[LENGTH(tags)];
     int nmasters[LENGTH(tags)];
     int padding[LENGTH(tags)];
@@ -393,7 +393,7 @@ struct Monitor {
     char ltsymbol[12];
     char selstat[12];
 
-    Monitor *next;
+    Monitor* next;
 };
 
 
@@ -678,6 +678,9 @@ void arrange_mon (Monitor* m) {
 
     if (m->layouts[m->current_tag]->arrange != NULL)
         m->layouts[m->current_tag]->arrange(m);
+
+    // restore floating geometry
+
     else {
         Client* c;
         for (c = m->clients; c != NULL; c = c->next) {
@@ -1349,38 +1352,27 @@ void manage (Window w, XWindowAttributes* wa) {
 
     c->oldbw = wa->border_width;
 
-    c->x = c->oldx = wa->x;
-    c->y = c->oldy = wa->y;
     c->w = c->oldw = wa->width;
     c->h = c->oldh = wa->height;
+
+    // center window
+
+    c->x = (c->mon->mw / 2) - (c->w / 2);
+    c->y = (c->mon->wh / 2) - (c->h / 2);
+
+    // set floating sizes
 
     c->fx = c->x;
     c->fy = c->y;
     c->fw = c->w;
     c->fh = c->h;
 
-    // make sure window is entirely visible
-
-    if (c->x + WIDTH(c) > c->mon->mx + c->mon->mw)
-        c->x = c->mon->mx + c->mon->mw - WIDTH(c);
-    if (c->y + HEIGHT(c) > c->mon->my + c->mon->mh)
-        c->y = c->mon->my + c->mon->mh - HEIGHT(c);
-
-    // fix y position if it's covering the bar
-
-    if (c->mon->show_bar) {
-        if (c->mon->bar_pos == TOP && c->y <= c->mon->bar_y + bar_height)
-            c->y = c->mon->wy;
-        else if (c->y + HEIGHT(c) >= c->mon->bar_y)
-            c->y = c->mon->bar_y - 1 - HEIGHT(c);
-    }
-
     update_window_type(c);
     update_size_hints(c);
     update_wm_hints(c);
 
-    if (c->isfloating == false)
-        c->isfloating = c->oldstate = trans != None || c->isfixed;
+    if (c->isfloating == false && (trans != None || c->isfixed))
+        c->isfloating = c->oldstate = true;
 
     if (c->isfullscreen || (smart_borders && c->mon->layouts[c->mon->current_tag]->arrange != NULL && c->isfloating == false
     && (c->mon->layouts[c->mon->current_tag]->arrange == &monocle || n_tiled(c->mon) == 0)))
@@ -1536,9 +1528,8 @@ void move_mouse (const Arg* arg) {
                     ny = selmon->wy + selmon->wh - HEIGHT(c);
             }
 
-            if (c->isfloating == false && selmon->layouts[selmon->current_tag]->arrange != NULL &&
-                (ev.xmotion.x < x - snap || ev.xmotion.x > x + snap || ev.xmotion.y < y - snap || ev.xmotion.y > y + snap))
-            {
+            if (c->isfloating == false && selmon->layouts[selmon->current_tag]->arrange != NULL
+            && (ev.xmotion.x < x - snap || ev.xmotion.x > x + snap || ev.xmotion.y < y - snap || ev.xmotion.y > y + snap)) {
                 c->fx = c->x;
                 c->fy = c->y;
                 c->fw = c->w;
@@ -1786,9 +1777,8 @@ void resize_mouse (const Arg* arg) {
             nh = MAX(ev.xmotion.y - ocy - (2 * c->bw) + 1, 1);
 
             if (c->mon->wx + nw >= selmon->wx && c->mon->wy + nh >= selmon->wy) {
-                if (c->isfloating == false && selmon->layouts[selmon->current_tag]->arrange != NULL &&
-                    (abs(nw - c->w) > snap || abs(nh - c->h) > snap))
-                {
+                if (c->isfloating == false && selmon->layouts[selmon->current_tag]->arrange != NULL
+                && (abs(nw - c->w) > snap || abs(nh - c->h) > snap)) {
                     c->fx = c->x;
                     c->fy = c->y;
                     c->fw = c->w;
@@ -2402,7 +2392,7 @@ void toggle_bar_pos (const Arg* arg) {
 }
 
 void toggle_floating (const Arg* arg) {
-    if (selmon->selected == NULL || selmon->layouts[selmon->current_tag] == NULL)
+    if (selmon->selected == NULL || selmon->layouts[selmon->current_tag]->arrange == NULL)
         return;
 
     Client* sel = selmon->selected;
