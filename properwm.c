@@ -189,7 +189,6 @@ bool apply_size_hints (Client* c, int* x, int* y, int* w, int* h, bool interact)
 void arrange (Monitor* m);
 void arrange_mon (Monitor* m);
 void attach (Client* c);
-void attach_head (Client* c);
 void attach_stack (Client* c);
 void attach_tail (Client* c);
 void button_press (XEvent* e);
@@ -693,13 +692,6 @@ void arrange_mon (Monitor* m) {
 }
 
 void attach (Client* c) {
-    if (attach_pos == HEAD)
-        attach_head(c);
-    else if (attach_pos == TAIL)
-        attach_tail(c);
-}
-
-inline void attach_head (Client* c) {
     c->next = c->mon->clients;
     c->mon->clients = c;
 }
@@ -709,22 +701,14 @@ void attach_stack (Client* c) {
     c->mon->stack = c;
 }
 
-inline void attach_tail (Client* c) {
-    if (c->mon->clients == NULL) {
+void attach_tail (Client* c) {
+    Client* ci;
+    for (ci = c->mon->clients; ci != NULL && ci->next != NULL; ci = ci->next);
+
+    if (ci == NULL)
         c->mon->clients = c;
-        return;
-    }
-
-    Client* ci = c->mon->clients;
-
-    while (ci != NULL) {
-        if (ci->next == NULL) {
-            ci->next = c;
-            return;
-        }
-
-        ci = ci->next;
-    }
+    else
+        ci->next = c;
 }
 
 void button_press (XEvent* e) {
@@ -1423,7 +1407,11 @@ void manage (Window w, XWindowAttributes* wa) {
     if (c->isfloating)
         XRaiseWindow(dpy, c->win);
 
-    attach(c);
+    if (attach_pos == HEAD)
+        attach(c);
+    else if (attach_pos == TAIL)
+        attach_tail(c);
+
     attach_stack(c);
 
     XChangeProperty(dpy, root, netatom[NetClientList], XA_WINDOW, 32, PropModeAppend,
