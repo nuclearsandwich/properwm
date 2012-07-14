@@ -189,7 +189,9 @@ bool apply_size_hints (Client* c, int* x, int* y, int* w, int* h, bool interact)
 void arrange (Monitor* m);
 void arrange_mon (Monitor* m);
 void attach (Client* c);
+void attach_head (Client* c);
 void attach_stack (Client* c);
+void attach_tail (Client* c);
 void button_press (XEvent* e);
 void check_other_wm (void);
 void clean_tag_focus (Monitor* m, Client* c);
@@ -691,6 +693,13 @@ void arrange_mon (Monitor* m) {
 }
 
 void attach (Client* c) {
+    if (attach_pos == HEAD)
+        attach_head(c);
+    else if (attach_pos == TAIL)
+        attach_tail(c);
+}
+
+inline void attach_head (Client* c) {
     c->next = c->mon->clients;
     c->mon->clients = c;
 }
@@ -698,6 +707,24 @@ void attach (Client* c) {
 void attach_stack (Client* c) {
     c->snext = c->mon->stack;
     c->mon->stack = c;
+}
+
+inline void attach_tail (Client* c) {
+    if (c->mon->clients == NULL) {
+        c->mon->clients = c;
+        return;
+    }
+
+    Client* ci = c->mon->clients;
+
+    while (ci != NULL) {
+        if (ci->next == NULL) {
+            ci->next = c;
+            return;
+        }
+
+        ci = ci->next;
+    }
 }
 
 void button_press (XEvent* e) {
@@ -1352,15 +1379,19 @@ void manage (Window w, XWindowAttributes* wa) {
 
     c->oldbw = wa->border_width;
 
+    c->x = c->oldx = wa->x;
+    c->y = c->oldy = wa->y;
     c->w = c->oldw = wa->width;
     c->h = c->oldh = wa->height;
 
     // center window
 
-    c->x = (c->mon->mw / 2) - (c->w / 2);
-    c->y = (c->mon->wh / 2) - (c->h / 2);
+    if (c->x == 0 && c->y == 0) {
+        c->x = (c->mon->mw / 2) - (c->w / 2);
+        c->y = (c->mon->wh / 2) - (c->h / 2);
+    }
 
-    // set floating sizes
+    // set floating geometry
 
     c->fx = c->x;
     c->fy = c->y;
@@ -1963,33 +1994,30 @@ void set_focus (Client* c) {
 void set_fullscreen (Client* c, bool fullscreen) {
     if (fullscreen) {
         XChangeProperty(dpy, c->win, netatom[NetWMState], XA_ATOM, 32,
-                        PropModeReplace, (unsigned char*)&netatom[NetWMFullscreen], 1);
+                        PropModeReplace, (unsigned char*) &netatom[NetWMFullscreen], 1);
 
+        c->oldstate = c->isfloating;
         c->isfloating = true;
         c->isfullscreen = true;
+
         c->oldbw = c->bw;
         c->bw = 0;
-        c->oldstate = c->isfloating;
 
-        if (smart_borders)
-            update_smart_borders(c->mon);
-
-        resize(c, c->mon->mx, c->mon->my, c->mon->mw, c->mon->mh, false);
+        XMoveResizeWindow(dpy, c->win, c->mon->mx, c->mon->my, c->mon->mw, c->mon->mh);
+        resize_client(c, c->mon->mx, c->mon->my, c->mon->mw, c->mon->mh);
         XRaiseWindow(dpy, c->win);
     }
     else {
         XChangeProperty(dpy, c->win, netatom[NetWMState], XA_ATOM, 32,
-                        PropModeReplace, (unsigned char*)0, 0);
+                        PropModeReplace, (unsigned char*) 0, 0);
 
         c->isfloating = c->oldstate;
         c->isfullscreen = false;
-        c->bw = c->oldbw;
-        c->x = c->oldx;
-        c->y = c->oldy;
-        c->w = c->oldw;
-        c->h = c->oldh;
 
-        resize(c, c->x, c->y, c->w, c->h, false);
+        c->bw = c->oldbw;
+
+        if (c->isfloating)
+            resize(c, c->fx, c->fy, c->fw, c->fh, false);
     }
 
     arrange(c->mon);
@@ -2403,8 +2431,10 @@ void toggle_floating (const Arg* arg) {
         if (sel->bw == 0)
             sel->bw = border_width;
 
-        if (sel->w == sel->fw && sel->h == sel->fh)
-            XResizeWindow(dpy, sel->win, sel->w * 2, sel->h * 2);
+        // HACK: borders are not restored if floating size is the same
+
+        if (sel->fw == sel->w && sel->fh == sel->h)
+            XResizeWindow(dpy, sel->win, MAX(1, (int) sel->w / 1.5), MAX(1, (int) sel->h / 1.5));
 
         resize(sel, sel->fx, sel->fy, sel->fw, sel->fh, false);
         XRaiseWindow(dpy, sel->win);
@@ -2885,7 +2915,7 @@ void update_smart_borders (Monitor* m) {
     Client* c;
 
     if (m->layouts[m->current_tag]->arrange == NULL) {
-        for (c = m->clients; c != NULL; c = c->next) {
+        for (c = m->clients; c != NULL; c = c->next) { // restore borders on all clients
             if (ISVISIBLE(c) && c->bw == 0) {
                 c->bw = border_width;
                 configure(c);
@@ -2896,6 +2926,8 @@ void update_smart_borders (Monitor* m) {
 
     int bw;
 
+    // disable borders if using monocle layout or if tiled window count is 1
+
     if (m->layouts[m->current_tag]->arrange == &monocle || n_tiled(m) == 1)
         bw = 0;
     else
@@ -2905,7 +2937,7 @@ void update_smart_borders (Monitor* m) {
         if (ISVISIBLE(c) && c->bw != bw) {
             c->bw = bw;
             configure(c);
-            XMoveResizeWindow(dpy, c->win, c->x, c->y, c->w * 2, c->h * 2); // fuck you, xlib
+//            XMoveResizeWindow(dpy, c->win, c->x, c->y, c->w * 2, c->h * 2); // fuck you, xlib
         }
     }
 }
