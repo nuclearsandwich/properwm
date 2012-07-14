@@ -2003,7 +2003,6 @@ void set_fullscreen (Client* c, bool fullscreen) {
         c->oldbw = c->bw;
         c->bw = 0;
 
-        XMoveResizeWindow(dpy, c->win, c->mon->mx, c->mon->my, c->mon->mw, c->mon->mh);
         resize_client(c, c->mon->mx, c->mon->my, c->mon->mw, c->mon->mh);
         XRaiseWindow(dpy, c->win);
     }
@@ -2431,10 +2430,10 @@ void toggle_floating (const Arg* arg) {
         if (sel->bw == 0)
             sel->bw = border_width;
 
-        // HACK: borders are not restored if floating size is the same
+        // HACK: borders are not restored if size doesn't change
 
         if (sel->fw == sel->w && sel->fh == sel->h)
-            XResizeWindow(dpy, sel->win, MAX(1, (int) sel->w / 1.5), MAX(1, (int) sel->h / 1.5));
+            resize(sel, sel->fx, sel->fy, sel->fw + 25, sel->fh + 25, false);
 
         resize(sel, sel->fx, sel->fy, sel->fw, sel->fh, false);
         XRaiseWindow(dpy, sel->win);
@@ -2936,8 +2935,7 @@ void update_smart_borders (Monitor* m) {
     for (c = next_tiled(m->clients); c != NULL; c = next_tiled(c->next)) {
         if (ISVISIBLE(c) && c->bw != bw) {
             c->bw = bw;
-            configure(c);
-//            XMoveResizeWindow(dpy, c->win, c->x, c->y, c->w * 2, c->h * 2); // fuck you, xlib
+            resize_client(c, c->x, c->y, c->w * 2, c->h * 2);
         }
     }
 }

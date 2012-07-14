@@ -79,7 +79,7 @@ static const char selected_mon_indicator_fg[] = "#628AB3";
 static char* tags[] =           { "M1", "M2", "M3", "M4", "M5", "E6", "E7", "E8", "E9" };
 
 static int layouts_init[] =     {    0,    0,    1,    1,    1,    2,    2,    2,    3 };
-static float mfactors_init[] =  { 0.50, 0.50, 0.65, 0.65, 0.65, 0.65, 0.65, 0.65, 0.50 };
+static float mfactors_init[] =  { 0.50, 0.50, 0.60, 0.60, 0.60, 0.60, 0.60, 0.60, 0.50 };
 static int padding_init[] =     {    0,    0,    6,    6,    6,    6,    6,    6,    6 };
 
 //
