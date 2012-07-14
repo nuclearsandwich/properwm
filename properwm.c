@@ -188,7 +188,7 @@ void apply_rules (Client* c);
 bool apply_size_hints (Client* c, int* x, int* y, int* w, int* h, bool interact);
 void arrange (Monitor* m);
 void arrange_mon (Monitor* m);
-void attach (Client* c);
+void attach_head (Client* c);
 void attach_stack (Client* c);
 void attach_tail (Client* c);
 void button_press (XEvent* e);
@@ -691,7 +691,7 @@ void arrange_mon (Monitor* m) {
     }
 }
 
-void attach (Client* c) {
+void attach_head (Client* c) {
     c->next = c->mon->clients;
     c->mon->clients = c;
 }
@@ -702,13 +702,19 @@ void attach_stack (Client* c) {
 }
 
 void attach_tail (Client* c) {
-    Client* ci;
-    for (ci = c->mon->clients; ci != NULL && ci->next != NULL; ci = ci->next);
+    Client* ct;
 
-    if (ci == NULL)
+    for (ct = c->mon->clients; ct != NULL; ct = ct->next) {
+        if (ct->next == NULL) {
+            ct->next = c;
+            return;
+        }
+    }
+
+    if (ct == NULL) {
+        c->next = c->mon->clients;
         c->mon->clients = c;
-    else
-        ci->next = c;
+    }
 }
 
 void button_press (XEvent* e) {
@@ -1363,16 +1369,17 @@ void manage (Window w, XWindowAttributes* wa) {
 
     c->oldbw = wa->border_width;
 
-    c->x = c->oldx = wa->x;
-    c->y = c->oldy = wa->y;
     c->w = c->oldw = wa->width;
     c->h = c->oldh = wa->height;
 
-    // center window
+    // center window if coords are unset
 
-    if (c->x == 0 && c->y == 0) {
-        c->x = (c->mon->mw / 2) - (c->w / 2);
-        c->y = (c->mon->wh / 2) - (c->h / 2);
+    if (wa->x == 0 && wa->y == 0) {
+        c->x = c->oldx = (c->mon->mw / 2) - (c->w / 2);
+        c->y = c->oldy = (c->mon->wh / 2) - (c->h / 2);
+    } else {
+        c->x = c->oldx = wa->x;
+        c->y = c->oldy = wa->y;
     }
 
     // set floating geometry
@@ -1396,27 +1403,28 @@ void manage (Window w, XWindowAttributes* wa) {
         c->bw = border_width;
 
     wc.border_width = c->bw;
-    XConfigureWindow(dpy, w, CWBorderWidth, &wc);
 
+    XConfigureWindow(dpy, w, CWBorderWidth, &wc);
     XSetWindowBorder(dpy, w, border_normal);
+
     configure(c);
 
     XSelectInput(dpy, w, EnterWindowMask|FocusChangeMask|PropertyChangeMask|StructureNotifyMask);
     grab_buttons(c, false);
 
-    if (c->isfloating)
-        XRaiseWindow(dpy, c->win);
-
     if (attach_pos == HEAD)
-        attach(c);
+        attach_head(c);
     else if (attach_pos == TAIL)
         attach_tail(c);
 
     attach_stack(c);
 
     XChangeProperty(dpy, root, netatom[NetClientList], XA_WINDOW, 32, PropModeAppend,
-                    (unsigned char *) &(c->win), 1);
-    XMoveResizeWindow(dpy, c->win, c->x + 2 * scr_width, c->y, c->w, c->h);
+                    (unsigned char*) &(c->win), 1);
+//    XMoveResizeWindow(dpy, c->win, c->x + scr_width * 2, c->y, c->w, c->h);
+
+    if (c->isfloating)
+        XRaiseWindow(dpy, c->win);
 
     set_client_state(c, NormalState);
 
@@ -1619,7 +1627,7 @@ int n_tiled (Monitor* m) {
 
 void pop (Client* c) {
     detach(c);
-    attach(c);
+    attach_head(c);
     focus(c);
     arrange(c->mon);
 }
@@ -1689,7 +1697,7 @@ void push_down (const Arg* arg) {
     } else {
         /* move to the front */
         detach(sel);
-        attach(sel);
+        attach_head(sel);
     }
 
     focus(sel);
@@ -1945,7 +1953,7 @@ void send_to_mon (Client* c, Monitor* m) {
     c->mon = m;
     c->tags = m->tagset[m->selected_tags];
 
-    attach(c);
+    attach_head(c);
     attach_stack(c);
 
     if (m->selected == NULL) {
@@ -2817,7 +2825,7 @@ bool update_geom (void) {
                     m->clients = c->next;
                     detach_stack(c);
                     c->mon = mons;
-                    attach(c);
+                    attach_head(c);
                     attach_stack(c);
                 }
 
