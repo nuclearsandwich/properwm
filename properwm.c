@@ -1421,20 +1421,25 @@ void manage (Window w, XWindowAttributes* wa) {
 
     XChangeProperty(dpy, root, netatom[NetClientList], XA_WINDOW, 32, PropModeAppend,
                     (unsigned char*) &(c->win), 1);
-//    XMoveResizeWindow(dpy, c->win, c->x + scr_width * 2, c->y, c->w, c->h);
-
-    if (c->isfloating)
-        XRaiseWindow(dpy, c->win);
 
     set_client_state(c, NormalState);
+
+    // set new selection
 
     if (c->mon == selmon)
         unfocus(selmon->selected, false);
 
     c->mon->selected = c;
 
+    // arrange and map window
+
     arrange(c->mon);
+
     XMapWindow(dpy, c->win);
+
+    if (c->isfloating)
+        XRaiseWindow(dpy, c->win);
+
     focus(NULL);
 }
 
@@ -1533,17 +1538,7 @@ void move_mouse (const Arg* arg) {
             else
                 ny = ocy + (ev.xmotion.y - y);
 
-            if (c->isfloating == false) {
-                if (nx < selmon->wx)
-                    nx = selmon->wx;
-                else if (nx + WIDTH(c) > selmon->wx + selmon->ww)
-                    nx = selmon->wx + selmon->ww - WIDTH(c);
-
-                if (ny < selmon->wy)
-                    ny = selmon->wy;
-                else if (ny + HEIGHT(c) > selmon->wy + selmon->wh)
-                    ny = selmon->wy + selmon->wh - HEIGHT(c);
-            } else {
+            if (c->isfloating || selmon->layouts[selmon->current_tag]->arrange == NULL) {
                 if (nx > selmon->wx && nx < selmon->wx + snap)
                     nx = selmon->wx;
                 else if (nx + WIDTH(c) < selmon->wx + selmon->ww && nx + WIDTH(c) > selmon->wx + selmon->ww - snap)
@@ -1555,7 +1550,7 @@ void move_mouse (const Arg* arg) {
                     ny = selmon->wy + selmon->wh - HEIGHT(c);
             }
 
-            if (c->isfloating == false && selmon->layouts[selmon->current_tag]->arrange != NULL
+            if ((c->isfloating == false && selmon->layouts[selmon->current_tag]->arrange != NULL)
             && (ev.xmotion.x < x - snap || ev.xmotion.x > x + snap || ev.xmotion.y < y - snap || ev.xmotion.y > y + snap)) {
                 c->fx = c->x;
                 c->fy = c->y;
@@ -1690,12 +1685,12 @@ void push_down (const Arg* arg) {
     c = next_tiled(sel->next);
 
     if (c) {
-        /* attach after c */
+        // attach after c
         detach(sel);
         sel->next = c->next;
         c->next = sel;
     } else {
-        /* move to the front */
+        // move to the front
         detach(sel);
         attach_head(sel);
     }
@@ -1714,7 +1709,7 @@ void push_up (const Arg* arg) {
     c = prev_tiled(sel);
 
     if (c) {
-        /* attach before c */
+        // attach before c
         detach(sel);
         sel->next = c;
         if (selmon->clients == c)
@@ -1724,7 +1719,7 @@ void push_up (const Arg* arg) {
             c->next = sel;
         }
     } else {
-        /* move to the end */
+        // move to the end
         for (c = sel; c->next; c = c->next);
         detach(sel);
         sel->next = NULL;
@@ -1851,19 +1846,18 @@ void restack (Monitor* m) {
     if (m->selected == NULL)
         return;
 
-    if (m->selected->isfloating)
+    if (m->selected->isfloating || m->layouts[m->current_tag]->arrange == NULL)
         XRaiseWindow(dpy, m->selected->win);
 
-    if (m->layouts[m->current_tag]->arrange != NULL) {
-        wc.stack_mode = Below;
-        wc.sibling = m->bar->win.base.xwin;
+    wc.stack_mode = Below;
+    wc.sibling = m->bar->win.base.xwin;
 
-        for (c = m->stack; c; c = c->snext) {
-            if (c->isfloating == false && ISVISIBLE(c)) {
-                XConfigureWindow(dpy, c->win, CWSibling|CWStackMode, &wc);
-                wc.sibling = c->win;
-            }
-        }
+    for (c = m->stack; c != NULL; c = c->snext) {
+        if (ISVISIBLE(c) == false)
+            continue;
+
+        XConfigureWindow(dpy, c->win, CWSibling|CWStackMode, &wc);
+        wc.sibling = c->win;
     }
 
     XSync(dpy, false);
@@ -2927,7 +2921,7 @@ void update_smart_borders (Monitor* m) {
         if (ISVISIBLE(c) && c->bw != bw) {
             c->bw = bw;
 
-            // HACK: borders are not restored if size doesn't change
+            // HACK: borders are not hidden/restored if size doesn't change
 
             resize_client(c, c->x, c->y, c->w + 5, c->h + 5);
         }
