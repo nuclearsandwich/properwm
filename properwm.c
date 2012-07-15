@@ -243,6 +243,7 @@ void resize (Client* c, int x, int y, int w, int h, bool interact);
 void resize_client (Client* c, int x, int y, int w, int h);
 void resize_mouse (const Arg* arg);
 void restack (Monitor* m);
+void restore_floating (Monitor* m);
 void run (void);
 void scan (void);
 bool send_event (Client* c, Atom proto);
@@ -660,7 +661,7 @@ bool apply_size_hints (Client* c, int* x, int* y, int* w, int* h, bool interact)
 }
 
 void arrange (Monitor* m) {
-    if (m) {
+    if (m != NULL) {
         show_hide(m->stack);
         arrange_mon(m);
         restack(m);
@@ -672,23 +673,15 @@ void arrange (Monitor* m) {
 }
 
 void arrange_mon (Monitor* m) {
-    if (smart_borders)
-        update_smart_borders(m);
-
     update_bar_layout(m);
 
-    if (m->layouts[m->current_tag]->arrange != NULL)
+    if (m->layouts[m->current_tag]->arrange != NULL) {
+        if (smart_borders)
+            update_smart_borders(m);
+
         m->layouts[m->current_tag]->arrange(m);
-
-    // restore floating geometry
-
-    else {
-        Client* c;
-        for (c = m->clients; c != NULL; c = c->next) {
-            if (ISVISIBLE(c) && c->isfullscreen == false)
-                resize(c, c->fx, c->fy, c->fw, c->fh, false);
-        }
-    }
+    } else
+        restore_floating(m);
 }
 
 void attach_head (Client* c) {
@@ -1864,6 +1857,24 @@ void restack (Monitor* m) {
     while(XCheckMaskEvent(dpy, EnterWindowMask, &ev));
 }
 
+void restore_floating (Monitor* m) {
+    Client* c;
+    for (c = m->clients; c != NULL; c = c->next) {
+        if (ISVISIBLE(c) && c->isfullscreen == false) {
+            if (c->bw == 0) {
+                c->bw = border_width;
+
+                // HACK: borders are not restored if size doesn't change
+
+                if (c->fw == c->w && c->fh == c->h)
+                    resize(c, c->fx, c->fy, c->fw + 5, c->fh + 5, false);
+            }
+
+            resize(c, c->fx, c->fy, c->fw, c->fh, false);
+        }
+    }
+}
+
 void run (void) {
     XSync(dpy, false);
 
@@ -2411,16 +2422,16 @@ void toggle_floating (const Arg* arg) {
     sel->isfloating = sel->isfloating == false || sel->isfixed;
 
     if (sel->isfloating) {
-        if (sel->bw == 0)
+        if (sel->bw == 0) {
             sel->bw = border_width;
 
-        // HACK: borders are not restored if size doesn't change
+            // HACK: borders are not restored if size doesn't change
 
-        if (sel->fw == sel->w && sel->fh == sel->h)
-            resize(sel, sel->fx, sel->fy, sel->fw + 5, sel->fh + 5, false);
+            if (sel->fw == sel->w && sel->fh == sel->h)
+                resize(sel, sel->fx, sel->fy, sel->fw + 5, sel->fh + 5, false);
+        }
 
         resize(sel, sel->fx, sel->fy, sel->fw, sel->fh, false);
-        configure(sel);
         XRaiseWindow(dpy, sel->win);
     }
     else if (sel->isfullscreen)
@@ -2464,6 +2475,9 @@ void toggle_view (const Arg* arg) {
                 }
             }
         }
+
+        if (selmon->layouts[selmon->current_tag]->arrange == NULL)
+            restore_floating(selmon);
 
         focus(selmon->tag_focus[selmon->current_tag]);
         arrange(selmon);
@@ -2896,19 +2910,8 @@ void update_numlock_mask (void) {
 }
 
 void update_smart_borders (Monitor* m) {
-    Client* c;
-
-    if (m->layouts[m->current_tag]->arrange == NULL) {
-        for (c = m->clients; c != NULL; c = c->next) { // restore borders on all clients
-            if (ISVISIBLE(c) && c->bw == 0) {
-                c->bw = border_width;
-                configure(c);
-            }
-        }
-        return;
-    }
-
     int bw;
+    Client* c;
 
     // disable borders if using monocle layout or if tiled window count is 1
 
