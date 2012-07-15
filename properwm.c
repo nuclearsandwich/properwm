@@ -2260,14 +2260,8 @@ void stack (Monitor* m) {
 void tag (const Arg* arg) {
     if (selmon->selected != NULL && arg->ui & TAGMASK) {
         selmon->selected->tags = arg->ui & TAGMASK;
-
-        // refocus if selected client was hidden
-
-        if (ISVISIBLE(selmon->selected) == false)
-            focus(NULL);
-        else
-            update_bar_tags(selmon);
-
+        unfocus(selmon->selected, true);
+        focus(NULL);
         arrange(selmon);
     }
 }
