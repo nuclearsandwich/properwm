@@ -1360,28 +1360,6 @@ void manage (Window w, XWindowAttributes* wa) {
         apply_rules(c);
     }
 
-    c->oldbw = wa->border_width;
-
-    c->w = c->oldw = wa->width;
-    c->h = c->oldh = wa->height;
-
-    // center window if coords are unset
-
-    if (wa->x == 0 && wa->y == 0) {
-        c->x = c->oldx = (c->mon->mw / 2) - (c->w / 2);
-        c->y = c->oldy = (c->mon->wh / 2) - (c->h / 2);
-    } else {
-        c->x = c->oldx = wa->x;
-        c->y = c->oldy = wa->y;
-    }
-
-    // set floating geometry
-
-    c->fx = c->x;
-    c->fy = c->y;
-    c->fw = c->w;
-    c->fh = c->h;
-
     update_window_type(c);
     update_size_hints(c);
     update_wm_hints(c);
@@ -1391,9 +1369,40 @@ void manage (Window w, XWindowAttributes* wa) {
 
     if (c->isfullscreen || (smart_borders && c->mon->layouts[c->mon->current_tag]->arrange != NULL && c->isfloating == false
     && (c->mon->layouts[c->mon->current_tag]->arrange == &monocle || n_tiled(c->mon) == 0)))
-        c->bw = 0;
+        c->bw = c->oldbw = 0;
     else
-        c->bw = border_width;
+        c->bw = c->oldbw = border_width;
+
+    c->w = wa->width;
+    c->h = wa->height;
+
+    // center window if x/y is unset
+
+    bool center = wa->x == 0 && wa->y == 0 && WIDTH(c) <= c->mon->mw && HEIGHT(c) <= c->mon->mh;
+
+    if (center)
+        c->x = (c->mon->mw / 2) - (WIDTH(c) / 2);
+    else
+        c->x = wa->x;
+
+    if (center)
+        c->y = (c->mon->mh / 2) - (HEIGHT(c) / 2);
+    else
+        c->y = wa->y;
+
+    // initially set old geometry
+
+    c->oldx = c->x;
+    c->oldy = c->y;
+    c->oldw = c->w;
+    c->oldh = c->h;
+
+    // set floating geometry
+
+    c->fx = c->x;
+    c->fy = c->y;
+    c->fw = c->w;
+    c->fh = c->h;
 
     wc.border_width = c->bw;
 
@@ -1416,6 +1425,7 @@ void manage (Window w, XWindowAttributes* wa) {
                     (unsigned char*) &(c->win), 1);
 
     set_client_state(c, NormalState);
+    resize(c, c->fx, c->fy, c->fw, c->fh, false);
 
     // set new selection
 
@@ -3097,13 +3107,15 @@ void view (const Arg* arg) {
 }
 
 Client* win_to_client (Window w) {
-    Client* c;
     Monitor* m;
+    Client* c;
 
-    for (m = mons; m; m = m->next)
-        for (c = m->clients; c; c = c->next)
+    for (m = mons; m; m = m->next) {
+        for (c = m->clients; c; c = c->next) {
             if (c->win == w)
                 return c;
+        }
+    }
 
     return NULL;
 }
