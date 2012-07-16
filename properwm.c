@@ -1373,12 +1373,20 @@ void manage (Window w, XWindowAttributes* wa) {
     else
         c->bw = c->oldbw = border_width;
 
+    // fix oversized windows
+
     c->w = wa->width;
     c->h = wa->height;
 
+    if (WIDTH(c) > c->mon->mw)
+        c->w = c->mon->mw - (c->bw * 2);
+    
+    if (HEIGHT(c) > c->mon->mh)
+        c->h = c->mon->mh - (c->bw * 2);
+
     // center window if x/y is unset
 
-    bool center = wa->x == 0 && wa->y == 0 && WIDTH(c) <= c->mon->mw && HEIGHT(c) <= c->mon->mh;
+    bool center = wa->x == 0 && wa->y == 0 && WIDTH(c) < c->mon->mw && HEIGHT(c) < c->mon->mh;
 
     if (center)
         c->x = (c->mon->mw / 2) - (WIDTH(c) / 2);
@@ -2517,10 +2525,10 @@ void unmanage (Client* c, bool destroyed) {
     clean_tag_focus(c->mon, c);
 
     if (destroyed == false) {
-        wc.border_width = c->oldbw;
+        wc.border_width = border_width;
         XGrabServer(dpy);
         XSetErrorHandler(xerror_dummy);
-        XConfigureWindow(dpy, c->win, CWBorderWidth, &wc); /* restore border */
+        XConfigureWindow(dpy, c->win, CWBorderWidth, &wc);
         XUngrabButton(dpy, AnyButton, AnyModifier, c->win);
         set_client_state(c, WithdrawnState);
         XSync(dpy, false);
