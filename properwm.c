@@ -1103,7 +1103,6 @@ void focus (Client* c) {
 
     update_bar_tags(selmon);
     update_bar_title(selmon);
-
     update_bar_window_stat(selmon);
 }
 
@@ -1590,15 +1589,8 @@ void move_mouse (const Arg* arg) {
 
     if (m != NULL && m != selmon) {
         send_to_mon(c, m);
-        selmon = m;
-        focus(NULL);
-        update_bar_mon_selections();
+        focus(c);
     }
-}
-
-Client* next_tiled (Client* c) {
-    for(; c && (c->isfloating || ISVISIBLE(c) == false); c = c->next);
-    return c;
 }
 
 Indicator* new_indicator (void) {
@@ -1629,6 +1621,11 @@ int n_tiled (Monitor* m) {
     }
 
     return nt;
+}
+
+Client* next_tiled (Client* c) {
+    for(; c != NULL && (c->isfloating || ISVISIBLE(c) == false); c = c->next);
+    return c;
 }
 
 void pop (Client* c) {
@@ -1960,15 +1957,27 @@ void send_to_mon (Client* c, Monitor* m) {
     if (c->mon == m)
         return;
 
-    clean_tag_focus(c->mon, c);
-
-    if (c->mon->selected == c)
-        c->mon->selected = NULL;
-
     unfocus(c, true);
 
     detach(c);
     detach_stack(c);
+
+    clean_tag_focus(c->mon, c);
+
+    if (c->mon->selected == c) {
+        Client* nc;
+
+        for (nc = c->mon->clients; nc != NULL; nc = c->next) {
+            if (nc->tags & c->mon->tagset[c->mon->selected_tags])
+                break;
+        }
+
+        c->mon->selected = nc;
+    }
+
+    update_bar_title(c->mon);
+    update_bar_tags(c->mon);
+    update_bar_window_stat(c->mon);
 
     // - - - - - - - - - - -
 
@@ -1981,15 +1990,14 @@ void send_to_mon (Client* c, Monitor* m) {
     if (m->selected == NULL) {
         m->selected = c;
         m->tag_focus[m->current_tag] = c;
-
-        update_bar_tags(m);
-        update_bar_title(m);
     }
 
-    update_bar_window_stat(m); // update window stat of target monitor
+    update_bar_title(m);
+    update_bar_tags(m);
+    update_bar_window_stat(m);
 
-    focus(NULL); // triggers update of tags,layout,title,stat
-    arrange(NULL);
+    if (c->isfloating == false)
+        arrange(NULL);
 }
 
 void set_client_state (Client* c, long state) {
@@ -2747,7 +2755,7 @@ inline void update_bar_title (Monitor* m) {
 void update_bar_window_stat (Monitor* m) {
     Client* c;
     int n = 0;
-    int sel = -1;
+    int sn = 0;
 
     for (c = m->clients; c != NULL; c = c->next) {
         if (ISVISIBLE(c) == false)
@@ -2756,11 +2764,11 @@ void update_bar_window_stat (Monitor* m) {
         n++;
 
         if (c == m->selected)
-            sel = n;
+            sn = n;
     }
 
-    if (n > 0) {
-        sprintf(m->selstat, "%d/%d", sel, n);
+    if (n > 0 && sn > 0) {
+        sprintf(m->selstat, "%d/%d", sn, n);
         loft_label_set_text(&m->bar->lb_winstat, m->selstat);
         loft_widget_show(&m->bar->lb_winstat.base);
     } else {
