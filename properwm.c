@@ -272,9 +272,9 @@ void unmap_notify (XEvent *e);
 void update_bars (void);
 void update_bar_layout (Monitor* m);
 void update_bar_mon_selections (void);
-void update_bar_window_stat (Monitor* m);
 void update_bar_tags (Monitor* m);
 void update_bar_title (Monitor* m);
+void update_bar_window_stat (Monitor* m);
 void update_client_list (void);
 bool update_geom (void);
 void update_mon_indicators (void);
@@ -1821,8 +1821,11 @@ void resize_mouse (const Arg* arg) {
             }
 
             if (selmon->layouts[selmon->current_tag]->arrange == false || c->isfloating) {
-                if (c->isfullscreen)
+                if (c->isfullscreen) {
+                    c->x = c->mon->mx;
+                    c->y = c->mon->my;
                     set_fullscreen(c, false);
+                }
 
                 resize(c, c->x, c->y, nw, nh, true);
 
@@ -1857,19 +1860,34 @@ void restack (Monitor* m) {
     if (m->selected == NULL)
         return;
 
-    if (m->selected->isfloating || m->layouts[m->current_tag]->arrange == NULL)
-        XRaiseWindow(dpy, m->selected->win);
+    XRaiseWindow(dpy, m->selected->win);
 
     wc.stack_mode = Below;
-    wc.sibling = m->bar->win.base.xwin;
+    wc.sibling = None;
+
+    // floating above tiled
 
     for (c = m->stack; c != NULL; c = c->snext) {
-        if (ISVISIBLE(c) == false)
+        if (ISVISIBLE(c) == false || c->isfloating == false)
             continue;
 
         XConfigureWindow(dpy, c->win, CWSibling|CWStackMode, &wc);
         wc.sibling = c->win;
     }
+
+    // tiled below floating
+
+    for (c = m->stack; c != NULL; c = c->snext) {
+        if (ISVISIBLE(c) == false || c->isfloating)
+            continue;
+
+        XConfigureWindow(dpy, c->win, CWSibling|CWStackMode, &wc);
+        wc.sibling = c->win;
+    }
+
+    // bar below all
+
+    XConfigureWindow(dpy, m->bar->win.base.xwin, CWSibling|CWStackMode, &wc);
 
     XSync(dpy, false);
     while(XCheckMaskEvent(dpy, EnterWindowMask, &ev));
@@ -2707,31 +2725,6 @@ void update_bar_mon_selections (void) {
     }
 }
 
-void update_bar_window_stat (Monitor* m) {
-    Client* c;
-    int n = 0;
-    int sel = -1;
-
-    for (c = m->clients; c != NULL; c = c->next) {
-        if (ISVISIBLE(c) == false)
-            continue;
-
-        n++;
-
-        if (c == m->selected)
-            sel = n;
-    }
-
-    if (n > 0) {
-        sprintf(m->selstat, "%d/%d", sel, n);
-        loft_label_set_text(&m->bar->lb_winstat, m->selstat);
-        loft_widget_show(&m->bar->lb_winstat.base);
-    } else {
-        m->selstat[0] = '\0';
-        loft_widget_hide(&m->bar->lb_winstat.base);
-    }
-}
-
 void update_bar_tags (Monitor* m) {
     int i;
     int cc;
@@ -2768,6 +2761,31 @@ void update_bar_tags (Monitor* m) {
 
 inline void update_bar_title (Monitor* m) {
     loft_label_set_text(&m->bar->lb_title, m->selected != NULL ? m->selected->name : NULL);
+}
+
+void update_bar_window_stat (Monitor* m) {
+    Client* c;
+    int n = 0;
+    int sel = -1;
+
+    for (c = m->clients; c != NULL; c = c->next) {
+        if (ISVISIBLE(c) == false)
+            continue;
+
+        n++;
+
+        if (c == m->selected)
+            sel = n;
+    }
+
+    if (n > 0) {
+        sprintf(m->selstat, "%d/%d", sel, n);
+        loft_label_set_text(&m->bar->lb_winstat, m->selstat);
+        loft_widget_show(&m->bar->lb_winstat.base);
+    } else {
+        m->selstat[0] = '\0';
+        loft_widget_hide(&m->bar->lb_winstat.base);
+    }
 }
 
 void update_client_list (void) {
@@ -2939,7 +2957,7 @@ void update_smart_borders (Monitor* m) {
         bw = border_width;
 
     for (c = next_tiled(m->clients); c != NULL; c = next_tiled(c->next)) {
-        if (ISVISIBLE(c) && c->bw != bw) {
+        if (ISVISIBLE(c) && c->isfullscreen == false && c->bw != bw) {
             c->bw = bw;
 
             // HACK: borders are not hidden/restored if size doesn't change
