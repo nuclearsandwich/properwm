@@ -1640,10 +1640,10 @@ void pop (Client* c) {
 
 Client* prev_tiled (Client* c) {
     Client* p;
-    Client* r;
+    Client* r = NULL;
 
-    for (p = selmon->clients, r = NULL; p && p != c; p = p->next) {
-        if (p->isfloating == false && ISVISIBLE(p))
+    for (p = selmon->clients; p != NULL && p != c; p = p->next) {
+        if (ISVISIBLE(p) && p->isfloating == false)
             r = p;
     }
 
@@ -1688,23 +1688,19 @@ void property_notify (XEvent* e) {
 
 void push_down (const Arg* arg) {
     Client* sel = selmon->selected;
-    Client* c;
 
-    if (sel == NULL || sel->isfloating)
+    if (sel == NULL || sel->isfloating || n_tiled(selmon) <= 1)
         return;
 
-    c = next_tiled(sel->next);
+    Client* c = next_tiled(sel->next);
+    detach(sel);
 
-    if (c) {
-        // attach after c
-        detach(sel);
+    if (c != NULL) { // attach after c
         sel->next = c->next;
         c->next = sel;
-    } else {
-        // move to the front
-        detach(sel);
-        attach_head(sel);
     }
+    else // move to the front
+        attach_head(sel);
 
     focus(sel);
     arrange(selmon);
@@ -1712,29 +1708,26 @@ void push_down (const Arg* arg) {
 
 void push_up (const Arg* arg) {
     Client* sel = selmon->selected;
-    Client* c;
 
-    if (sel == NULL || sel->isfloating)
+    if (sel == NULL || sel->isfloating || n_tiled(selmon) <= 1)
         return;
 
-    c = prev_tiled(sel);
+    Client* c = prev_tiled(sel);
+    detach(sel);
 
-    if (c) {
-        // attach before c
-        detach(sel);
+    if (c != NULL) { // attach before c
         sel->next = c;
-        if (selmon->clients == c)
+
+        if (c == selmon->clients)
             selmon->clients = sel;
         else {
-            for(c = selmon->clients; c->next != sel->next; c = c->next);
+            for (c = selmon->clients; c->next != sel->next; c = c->next);
             c->next = sel;
         }
-    } else {
-        // move to the end
-        for (c = sel; c->next; c = c->next);
-        detach(sel);
-        sel->next = NULL;
+    } else { // move to the end
+        for (c = selmon->clients; c->next != NULL; c = c->next);
         c->next = sel;
+        sel->next = NULL;
     }
 
     focus(sel);
@@ -1809,25 +1802,24 @@ void resize_mouse (const Arg* arg) {
             nw = MAX(ev.xmotion.x - ocx - (2 * c->bw) + 1, 1);
             nh = MAX(ev.xmotion.y - ocy - (2 * c->bw) + 1, 1);
 
-            if (c->mon->wx + nw >= selmon->wx && c->mon->wy + nh >= selmon->wy) {
-                if (c->isfloating == false && selmon->layouts[selmon->current_tag]->arrange != NULL
-                && (abs(nw - c->w) > snap || abs(nh - c->h) > snap)) {
-                    c->fx = c->x;
-                    c->fy = c->y;
-                    c->fw = c->w;
-                    c->fh = c->h;
-                    toggle_floating(NULL);
-                }
+            if (c->mon->wx + nw >= selmon->wx && c->mon->wy + nh >= selmon->wy
+            && c->isfloating == false && selmon->layouts[selmon->current_tag]->arrange != NULL
+            && ((nw - c->w) > snap || (nh - c->h) > snap)) {
+                c->fx = c->x;
+                c->fy = c->y;
+                c->fw = c->w;
+                c->fh = c->h;
+                toggle_floating(NULL);
             }
 
-            if (selmon->layouts[selmon->current_tag]->arrange == false || c->isfloating) {
+            if (c->isfloating) {
                 if (c->isfullscreen) {
-                    c->x = c->mon->mx;
-                    c->y = c->mon->my;
+                    c->fx = c->mon->mx;
+                    c->fy = c->mon->my;
                     set_fullscreen(c, false);
                 }
 
-                resize(c, c->x, c->y, nw, nh, true);
+                resize(c, c->fx, c->fy, nw, nh, true);
 
                 c->fw = c->w;
                 c->fh = c->h;
@@ -1860,22 +1852,11 @@ void restack (Monitor* m) {
     if (m->selected == NULL)
         return;
 
-    XRaiseWindow(dpy, m->selected->win);
+    if (m->selected->isfloating)
+        XRaiseWindow(dpy, m->selected->win);
 
     wc.stack_mode = Below;
     wc.sibling = None;
-
-    // floating above tiled
-
-    for (c = m->stack; c != NULL; c = c->snext) {
-        if (ISVISIBLE(c) == false || c->isfloating == false)
-            continue;
-
-        XConfigureWindow(dpy, c->win, CWSibling|CWStackMode, &wc);
-        wc.sibling = c->win;
-    }
-
-    // tiled below floating
 
     for (c = m->stack; c != NULL; c = c->snext) {
         if (ISVISIBLE(c) == false || c->isfloating)
