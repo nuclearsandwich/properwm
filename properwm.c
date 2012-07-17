@@ -1684,11 +1684,10 @@ void property_notify (XEvent* e) {
 }
 
 void push_down (const Arg* arg) {
-    Client* sel = selmon->selected;
-
-    if (sel == NULL || sel->isfloating || n_tiled(selmon) <= 1)
+    if (selmon->selected == NULL || selmon->selected->isfloating)
         return;
 
+    Client* sel = selmon->selected;
     Client* c = next_tiled(sel->next);
     detach(sel);
 
@@ -1696,7 +1695,7 @@ void push_down (const Arg* arg) {
         sel->next = c->next;
         c->next = sel;
     }
-    else // move to the front
+    else // move to head
         attach_head(sel);
 
     focus(sel);
@@ -1704,11 +1703,10 @@ void push_down (const Arg* arg) {
 }
 
 void push_up (const Arg* arg) {
-    Client* sel = selmon->selected;
-
-    if (sel == NULL || sel->isfloating || n_tiled(selmon) <= 1)
+    if (selmon->selected == NULL || selmon->selected->isfloating)
         return;
 
+    Client* sel = selmon->selected;
     Client* c = prev_tiled(sel);
     detach(sel);
 
@@ -1721,7 +1719,8 @@ void push_up (const Arg* arg) {
             for (c = selmon->clients; c->next != sel->next; c = c->next);
             c->next = sel;
         }
-    } else { // move to the end
+    }
+    else { // move to tail
         for (c = selmon->clients; c->next != NULL; c = c->next);
         c->next = sel;
         sel->next = NULL;
