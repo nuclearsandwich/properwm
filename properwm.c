@@ -1849,23 +1849,23 @@ void restack (Monitor* m) {
     if (m->selected == NULL)
         return;
 
-    if (m->selected->isfloating)
-        XRaiseWindow(dpy, m->selected->win);
+    XRaiseWindow(dpy, m->selected->win);
 
-    wc.stack_mode = Below;
+    wc.stack_mode = Above;
     wc.sibling = None;
 
+    XConfigureWindow(dpy, m->bar->win.base.xwin, CWSibling|CWStackMode, &wc);
+
+    wc.stack_mode = Below;
+    wc.sibling = m->bar->win.base.xwin;
+
     for (c = m->stack; c != NULL; c = c->snext) {
-        if (ISVISIBLE(c) == false || c->isfloating)
+        if (ISVISIBLE(c) == false)
             continue;
 
         XConfigureWindow(dpy, c->win, CWSibling|CWStackMode, &wc);
         wc.sibling = c->win;
     }
-
-    // bar below all
-
-    XConfigureWindow(dpy, m->bar->win.base.xwin, CWSibling|CWStackMode, &wc);
 
     XSync(dpy, false);
     while(XCheckMaskEvent(dpy, EnterWindowMask, &ev));
