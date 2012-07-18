@@ -230,7 +230,6 @@ void mod_padding (const Arg* arg);
 void monocle (Monitor* m);
 void move_mouse (const Arg* arg);
 Client* next_tiled (Client* c);
-Indicator* new_indicator (void);
 int n_tiled (Monitor* m);
 void pop (Client* c);
 Client* prev_tiled (Client* c);
@@ -238,6 +237,7 @@ void property_notify (XEvent* e);
 void push_down (const Arg* arg);
 void push_up (const Arg* arg);
 void quit (const Arg* arg);
+void refresh_indicators (void);
 void reset_nmaster (const Arg* arg);
 void resize (Client* c, int x, int y, int w, int h, bool interact);
 void resize_client (Client* c, int x, int y, int w, int h);
@@ -271,13 +271,12 @@ void unmanage (Client* c, bool destroyed);
 void unmap_notify (XEvent *e);
 void update_bars (void);
 void update_bar_layout (Monitor* m);
-void update_bar_mon_selections (void);
 void update_bar_tags (Monitor* m);
 void update_bar_title (Monitor* m);
 void update_bar_window_stat (Monitor* m);
 void update_client_list (void);
+void update_indicators (void);
 void update_monitors (void);
-void update_mon_indicators (void);
 void update_numlock_mask (void);
 void update_smart_borders (Monitor* m);
 void update_size_hints (Client* c);
@@ -359,7 +358,7 @@ typedef struct Bar {
     LoftLabel lb_title;
     LoftLabel lb_status;
 
-    Indicator* indicator;
+    Indicator indicator;
 } Bar;
 
 struct Monitor {
@@ -722,7 +721,7 @@ void button_press (XEvent* e) {
         if (c == NULL)
             focus(m->tag_focus[m->current_tag]);
 
-        update_bar_mon_selections();
+        refresh_indicators();
     }
 
     int click = ClickRoot;
@@ -767,7 +766,7 @@ void clean_tag_focus (Monitor* m, Client* c) {
 void cleanup (void) {
     Arg a = {.ui = ~0};
     Layout foo = { "", NULL };
-    Monitor *m;
+    Monitor* m;
 
     view(&a);
     selmon->layouts[selmon->current_tag] = &foo;
@@ -779,8 +778,11 @@ void cleanup (void) {
 
     XUngrabKey(dpy, AnyKey, AnyModifier, root);
 
-    while (mons != NULL)
-        destroy_mon(mons);
+    while (mons != NULL) {
+        m = mons;
+        mons = m->next;
+        destroy_mon(m);
+    }
 
     XSync(dpy, false);
     XSetInputFocus(dpy, PointerRoot, RevertToPointerRoot, CurrentTime);
@@ -850,17 +852,14 @@ void configure_notify (XEvent* e) {
 
         update_monitors();
         update_bars();
+        update_indicators();
 
-        update_mon_indicators();
+//      Monitor* m;
 
-        if (mons->next != NULL)
-            update_bar_mon_selections();
-
-        Monitor* m;
-        for (m = mons; m != NULL; m = m->next) {
-            loft_widget_move(&m->bar->win.base, m->mx, m->bar_y);
-            loft_widget_resize(&m->bar->win.base, m->mw, m->mh);
-        }
+//      for (m = mons; m != NULL; m = m->next) {
+//          loft_widget_move(&m->bar->win.base, m->mx, m->bar_y);
+//          loft_widget_resize(&m->bar->win.base, m->mw, m->mh);
+//      }
 
         focus(NULL);
         arrange(NULL);
@@ -980,15 +979,6 @@ Monitor* create_mon (void) {
 }
 
 void destroy_mon (Monitor* mon) {
-    Monitor* m;
-
-    if (mon == mons)
-        mons = mons->next;
-    else {
-        for (m = mons; m != NULL && m->next != mon; m = m->next);
-        m->next = mon->next;
-    }
-
     loft_widget_hide_all(&mon->bar->win.base);
 
     int i;
@@ -1000,11 +990,7 @@ void destroy_mon (Monitor* mon) {
     loft_widget_destroy(&mon->bar->lb_status.base);
     loft_widget_destroy(&mon->bar->lt_tagstrip.base);
     loft_widget_destroy(&mon->bar->lt_main.base);
-
-    if (mon->bar->indicator != NULL) {
-        loft_widget_destroy(&mon->bar->indicator->base);
-        free(mon->bar->indicator);
-    }
+    loft_widget_destroy(&mon->bar->indicator.base);
 
     free(mon->bar);
     free(mon);
@@ -1087,7 +1073,7 @@ void focus (Client* c) {
     if (c) {
         if (c->mon != selmon) {
             selmon = c->mon;
-            update_bar_mon_selections();
+            refresh_indicators();
         }
 
         if (c->isurgent)
@@ -1129,7 +1115,7 @@ void focus_mon (const Arg* arg) {
     selmon = m;
 
     update_bar_tags(oldmon);
-    update_bar_mon_selections();
+    refresh_indicators();
 
     focus(m->tag_focus[m->current_tag]);
 }
@@ -1290,19 +1276,6 @@ void grab_keys (void) {
     }
 }
 
-#ifdef XINERAMA
-static bool unique_geometry(XineramaScreenInfo* unique, size_t n, XineramaScreenInfo* info) {
-    while (n--) {
-        if (unique[n].x_org == info->x_org
-        && unique[n].y_org == info->y_org
-        && unique[n].width == info->width
-        && unique[n].height == info->height)
-            return false;
-    }
-    return true;
-}
-#endif/* XINERAMA */
-
 void iteration (void) {
     XEvent ev;
     XNextEvent(dpy, &ev);
@@ -1351,6 +1324,9 @@ void manage (Window w, XWindowAttributes* wa) {
 
     if (c == NULL)
         die("out of memory\n");
+
+    c->next = NULL;
+    c->snext = NULL;
 
     // set window and title
 
@@ -1624,24 +1600,6 @@ void move_mouse (const Arg* arg) {
     }
 }
 
-Indicator* new_indicator (void) {
-    Indicator* mi = malloc(sizeof(Indicator));
-    loft_widget_init(&mi->base, "indicator", 0);
-    mi->base.draw_base = false;
-
-    loft_rgba_set_from_str(&mi->style.normal.bg, (char*) normal_mon_indicator_bg);
-    loft_rgba_set_from_str(&mi->style.normal.fg, (char*) normal_mon_indicator_fg);
-    loft_rgba_set_from_str(&mi->style.selected.bg, (char*) selected_mon_indicator_bg);
-    loft_rgba_set_from_str(&mi->style.selected.fg, (char*) selected_mon_indicator_fg);
-
-    mi->active = false;
-
-    loft_widget_set_minimum_size(&mi->base, bar_height, bar_height);
-    loft_signal_connect(&mi->base, "draw", _draw_indicator, NULL);
-
-    return mi;
-}
-
 int n_tiled (Monitor* m) {
     Client* c;
     int nt = 0;
@@ -1765,6 +1723,15 @@ void quit (const Arg* arg) {
     running = false;
 }
 
+void refresh_indicators (void) {
+    Monitor* m;
+
+    for (m = mons; m != NULL; m = m->next) {
+        m->bar->indicator.active = selmon == m;
+        REDRAW_IF_VISIBLE(&m->bar->indicator.base);
+    }
+}
+
 void reset_nmaster (const Arg* arg) {
     selmon->nmasters[selmon->current_tag] = nmaster;
     arrange(selmon);
@@ -1867,7 +1834,7 @@ void resize_mouse (const Arg* arg) {
         send_to_mon(c, m);
         selmon = m;
         focus(NULL);
-        update_bar_mon_selections();
+        refresh_indicators();
     }
 }
 
@@ -2134,16 +2101,8 @@ void setup (void) {
     scr_height = DisplayHeight(dpy, screen);
 
     update_monitors();
-    printf("monitors initialized\n");
-
     update_bars();
-    printf("bars initialized\n");
-
-    if (mons->next != NULL) {
-        update_mon_indicators();
-        printf("indicators initialized\n");
-        update_bar_mon_selections();
-    }
+    update_indicators();
 
     update_status();
 
@@ -2556,6 +2515,19 @@ void unfocus (Client* c, bool setfocus) {
     }
 }
 
+#ifdef XINERAMA
+static bool unique_geometry(XineramaScreenInfo* unique, size_t n, XineramaScreenInfo* info) {
+    while (n--) {
+        if (unique[n].x_org == info->x_org
+        && unique[n].y_org == info->y_org
+        && unique[n].width == info->width
+        && unique[n].height == info->height)
+            return false;
+    }
+    return true;
+}
+#endif/* XINERAMA */
+
 void unmanage (Client* c, bool destroyed) {
     Monitor* m = c->mon;
     XWindowChanges wc;
@@ -2624,18 +2596,33 @@ void update_bars (void) {
 
         loft_label_init(&m->bar->lb_layout, m->ltsymbol, 0);
         loft_label_init(&m->bar->lb_winstat, m->selstat, 0);
-        loft_label_init(&m->bar->lb_title, m->selected != NULL ? m->selected->name : NULL, FLOW_L);
-        loft_label_init(&m->bar->lb_status, status, FLOW_R);
 
+        loft_label_init(&m->bar->lb_title, m->selected != NULL ? m->selected->name : NULL, FLOW_L);
         loft_label_truncate(&m->bar->lb_title, true);
 
-        m->bar->indicator = NULL;
+        loft_label_init(&m->bar->lb_status, status, FLOW_R);
+
+        // indicator
+
+        loft_widget_init(&m->bar->indicator.base, "indicator", 0);
+        loft_widget_set_minimum_size(&m->bar->indicator.base, bar_height, bar_height);
+        loft_signal_connect(&m->bar->indicator.base, "draw", _draw_indicator, NULL);
+
+        loft_rgba_set_from_str(&m->bar->indicator.style.normal.bg, (char*) normal_mon_indicator_bg);
+        loft_rgba_set_from_str(&m->bar->indicator.style.normal.fg, (char*) normal_mon_indicator_fg);
+        loft_rgba_set_from_str(&m->bar->indicator.style.selected.bg, (char*) selected_mon_indicator_bg);
+        loft_rgba_set_from_str(&m->bar->indicator.style.selected.fg, (char*) selected_mon_indicator_fg);
+
+        m->bar->indicator.active = m == selmon;
+
+        // - - - - - - - - - - -
 
         m->bar->win.base.draw_base = false;
         m->bar->lb_layout.base.draw_base = false;
         m->bar->lb_winstat.base.draw_base = false;
         m->bar->lb_title.base.draw_base = false;
         m->bar->lb_status.base.draw_base = false;
+        m->bar->indicator.base.draw_base = false;
 
         loft_label_set_padding(&m->bar->lb_layout, 10,0,10,0);
         loft_label_set_padding(&m->bar->lb_winstat, 10,0,10,0);
@@ -2647,6 +2634,7 @@ void update_bars (void) {
         loft_layout_attach(&m->bar->lt_main, &m->bar->lb_title.base, EXPAND_X | EXPAND_Y);
         loft_layout_attach(&m->bar->lt_main, &m->bar->lb_winstat.base, EXPAND_Y);
         loft_layout_attach(&m->bar->lt_main, &m->bar->lb_status.base, EXPAND_Y);
+        loft_layout_attach(&m->bar->lt_main, &m->bar->indicator.base, EXPAND_Y);
 
         for (i = 0; i < LENGTH(tags); i++) {
             t = &m->bar->lb_tags[i];
@@ -2736,18 +2724,6 @@ inline void update_bar_layout (Monitor* m) {
     loft_label_set_text(&m->bar->lb_layout, m->ltsymbol);
 }
 
-void update_bar_mon_selections (void) {
-    if (mons->next == NULL)
-        return;
-
-    Monitor* m;
-
-    for (m = mons; m != NULL; m = m->next) {
-        m->bar->indicator->active = selmon == m;
-        REDRAW_IF_VISIBLE(&m->bar->indicator->base);
-    }
-}
-
 void update_bar_tags (Monitor* m) {
     int i;
     int cc;
@@ -2823,6 +2799,19 @@ void update_client_list (void) {
                             (unsigned char *) &(c->win), 1);
 }
 
+void update_indicators (void) {
+    Monitor* m;
+
+    if (mons->next != NULL) { // show indicators
+        for (m = mons; m != NULL; m = m->next)
+            loft_widget_show(&m->bar->indicator.base);
+    }
+    else { // hide indicators
+        for (m = mons; m != NULL; m = m->next)
+            loft_widget_hide(&m->bar->indicator.base);
+    }
+}
+
 void update_monitors (void) {
 #ifdef XINERAMA
     if (XineramaIsActive(dpy)) {
@@ -2862,22 +2851,34 @@ void update_monitors (void) {
             update_struts(m);
         }
 
-        while (oldmons != NULL) {
-            m = oldmons;
+        free(unique);
 
-            for (c = m->clients; c != NULL; c = c->next) {
-                detach(c);
+        printf("monitors updated\n");
+
+        for (m = oldmons; m != NULL; m = m->next) {
+            while (m->clients != NULL) {
+                c = m->clients;
+                m->clients = c->next;
+
                 detach_stack(c);
+
                 c->mon = mons;
-                attach_tail(c);
+                c->tags = 1 << mons->current_tag;
+
+                attach_head(c);
                 attach_stack(c);
             }
+        }
 
+        printf("clients transferred\n");
+
+        while (oldmons != NULL) {
+            m = oldmons;
             oldmons = m->next;
             destroy_mon(m);
         }
 
-        free(unique);
+        printf("old monitors removed\n");
     }
     else
 #endif
@@ -2894,30 +2895,6 @@ void update_monitors (void) {
 
     selmon = mons;
     selmon = win_to_mon(root);
-}
-
-void update_mon_indicators (void) {
-    Monitor* m;
-
-    if (mons->next != NULL) {
-        for (m = mons; m != NULL; m = m->next) {
-            if (m->bar != NULL && m->bar->indicator == NULL) {
-                m->bar->indicator = new_indicator();
-                m->bar->indicator->active = selmon == m;
-                loft_layout_attach(&m->bar->lt_main, &m->bar->indicator->base, EXPAND_Y);
-                loft_widget_show(&m->bar->indicator->base);
-            }
-        }
-    } else {
-        for (m = mons; m != NULL; m = m->next) {
-            if (m->bar != NULL && m->bar->indicator != NULL) {
-                loft_layout_detach(&m->bar->lt_main, &m->bar->indicator->base);
-                loft_widget_destroy(&m->bar->indicator->base);
-                free(m->bar->indicator);
-                m->bar->indicator = NULL;
-            }
-        }
-    }
 }
 
 void update_numlock_mask (void) {
