@@ -1368,6 +1368,17 @@ void manage (Window w, XWindowAttributes* wa) {
         apply_rules(c);
     }
 
+    // update stuff
+
+    update_window_type(c);
+    update_size_hints(c);
+    update_wm_hints(c);
+
+    // set floating if transient/fixed
+
+    if (c->isfloating == false)
+        c->isfloating = c->oldstate = (trans != None || c->isfixed);
+
     // set border width
 
     if (c->isfullscreen || (smart_borders && c->mon->layouts[c->mon->current_tag]->arrange != NULL && c->isfloating == false
@@ -1378,24 +1389,21 @@ void manage (Window w, XWindowAttributes* wa) {
 
     // fix oversized windows
 
-    if (wa->width >= c->mon->mw) {
+    if (wa->width >= c->mon->mw)
         c->w = c->mon->mw - (c->bw * 2);
-        printf("shrinking width of %s; %dpx\n", c->name, c->w);
-    } else
+    else
         c->w = wa->width;
 
-    if (wa->height >= c->mon->mh) {
+    if (wa->height >= c->mon->mh)
         c->h = c->mon->mh - (c->bw * 2);
-        printf("shrinking height of %s; %dpx\n", c->name, c->h);
-    } else
+    else
         c->h = wa->height;
 
     // center window if x/y is unset
 
-    if (wa->x == 0 && wa->y == 0 && WIDTH(c) < c->mon->mw && HEIGHT(c) < c->mon->mh) {
-        printf("centering %s\n", c->name);
-        c->x = (c->mon->mw / 2) - (WIDTH(c) / 2);
-        c->y = (c->mon->mh / 2) - (HEIGHT(c) / 2);
+    if (wa->x == 0 && wa->y == 0 && WIDTH(c) < c->mon->ww && HEIGHT(c) < c->mon->wh) {
+        c->x = c->mon->wx + ((c->mon->ww / 2) - (WIDTH(c) / 2));
+        c->y = c->mon->wy + ((c->mon->wh / 2) - (HEIGHT(c) / 2));
     } else {
         c->x = wa->x;
         c->y = wa->y;
@@ -1414,17 +1422,6 @@ void manage (Window w, XWindowAttributes* wa) {
     c->fy = c->y;
     c->fw = c->w;
     c->fh = c->h;
-
-    // update stuff
-
-    update_window_type(c);
-    update_size_hints(c);
-    update_wm_hints(c);
-
-    // set floating if transient/fixed
-
-    if (c->isfloating == false)
-        c->isfloating = c->oldstate = (trans != None || c->isfixed);
 
     // propagate border
 

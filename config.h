@@ -16,7 +16,7 @@ static const char font_name[] =         "Droid Sans";
 static const int font_size =            11;
 static const int bar_height =           26;
 
-static int attach_pos =                 TAIL;           // initial orientation of new clients
+static int attach_pos =                 TAIL;           // initial position of new clients
 static int bar_pos =                    TOP;            // bar position, TOP or BOTTOM
 static unsigned int border_width =      1;              // window border width
 static bool click_to_focus =            true;           // require click to focus windows with mouse, otherwise automatic
@@ -106,7 +106,7 @@ static const char* dmenucmd[] = {
 };
 
 static char* termcmd[]  = { "roxterm", NULL };
-static char* browsercmd[] = { "chromium", NULL };
+static char* browsercmd[] = { "firefox", NULL };
 
 //
 // WINDOW RULES
