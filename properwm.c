@@ -901,6 +901,11 @@ void configure_request (XEvent* e) {
             if ((c->y + c->h) > m->my + m->mh && c->isfloating)
                 c->y = m->my + (m->mh / 2 - HEIGHT(c) / 2); /* center in y direction */
 
+            c->fx = c->x;
+            c->fy = c->y;
+            c->fw = c->w;
+            c->fh = c->h;
+
             if ((ev->value_mask & (CWX|CWY)) && !(ev->value_mask & (CWWidth|CWHeight)))
                 configure(c);
 
@@ -1344,11 +1349,15 @@ void manage (Window w, XWindowAttributes* wa) {
     if (c == NULL)
         die("out of memory\n");
 
+    // set window and title
+
     c->win = w;
     update_title(c);
 
     int ret = XGetTransientForHint(dpy, w, &trans);
     Client* t = win_to_client(trans);
+
+    // set monitor and tags
 
     if (ret && t != NULL) {
         c->mon = t->mon;
@@ -1359,43 +1368,38 @@ void manage (Window w, XWindowAttributes* wa) {
         apply_rules(c);
     }
 
-    update_window_type(c);
-    update_size_hints(c);
-    update_wm_hints(c);
-
-    if (c->isfloating == false && (trans != None || c->isfixed))
-        c->isfloating = c->oldstate = true;
+    // set border width
 
     if (c->isfullscreen || (smart_borders && c->mon->layouts[c->mon->current_tag]->arrange != NULL && c->isfloating == false
     && (c->mon->layouts[c->mon->current_tag]->arrange == &monocle || n_tiled(c->mon) == 0)))
-        c->bw = c->oldbw = 0;
+        c->bw = 0;
     else
-        c->bw = c->oldbw = border_width;
+        c->bw = border_width;
 
     // fix oversized windows
 
-    c->w = wa->width;
-    c->h = wa->height;
-
-    if (WIDTH(c) > c->mon->mw)
+    if (wa->width >= c->mon->mw) {
         c->w = c->mon->mw - (c->bw * 2);
-    
-    if (HEIGHT(c) > c->mon->mh)
+        printf("shrinking width of %s; %dpx\n", c->name, c->w);
+    } else
+        c->w = wa->width;
+
+    if (wa->height >= c->mon->mh) {
         c->h = c->mon->mh - (c->bw * 2);
+        printf("shrinking height of %s; %dpx\n", c->name, c->h);
+    } else
+        c->h = wa->height;
 
     // center window if x/y is unset
 
-    bool center = wa->x == 0 && wa->y == 0 && WIDTH(c) < c->mon->mw && HEIGHT(c) < c->mon->mh;
-
-    if (center)
+    if (wa->x == 0 && wa->y == 0 && WIDTH(c) < c->mon->mw && HEIGHT(c) < c->mon->mh) {
+        printf("centering %s\n", c->name);
         c->x = (c->mon->mw / 2) - (WIDTH(c) / 2);
-    else
-        c->x = wa->x;
-
-    if (center)
         c->y = (c->mon->mh / 2) - (HEIGHT(c) / 2);
-    else
+    } else {
+        c->x = wa->x;
         c->y = wa->y;
+    }
 
     // initially set old geometry
 
@@ -1411,6 +1415,19 @@ void manage (Window w, XWindowAttributes* wa) {
     c->fw = c->w;
     c->fh = c->h;
 
+    // update stuff
+
+    update_window_type(c);
+    update_size_hints(c);
+    update_wm_hints(c);
+
+    // set floating if transient/fixed
+
+    if (c->isfloating == false)
+        c->isfloating = c->oldstate = (trans != None || c->isfixed);
+
+    // propagate border
+
     wc.border_width = c->bw;
 
     XConfigureWindow(dpy, w, CWBorderWidth, &wc);
@@ -1418,8 +1435,12 @@ void manage (Window w, XWindowAttributes* wa) {
 
     configure(c);
 
+    // select events
+
     XSelectInput(dpy, w, EnterWindowMask|FocusChangeMask|PropertyChangeMask|StructureNotifyMask);
     grab_buttons(c, false);
+
+    // attach
 
     if (attach_pos == HEAD)
         attach_head(c);
@@ -1428,27 +1449,34 @@ void manage (Window w, XWindowAttributes* wa) {
 
     attach_stack(c);
 
+    // append to client list
+
     XChangeProperty(dpy, root, netatom[NetClientList], XA_WINDOW, 32, PropModeAppend,
                     (unsigned char*) &(c->win), 1);
+
+    // set normal state, initial resize
 
     set_client_state(c, NormalState);
     resize(c, c->fx, c->fy, c->fw, c->fh, false);
 
-    // set new selection
+    // set as selected client
 
     if (c->mon == selmon)
         unfocus(selmon->selected, false);
 
     c->mon->selected = c;
 
-    // arrange and map window
+    // arrange monitor, map window
 
     arrange(c->mon);
-
     XMapWindow(dpy, c->win);
+
+    // raise if floating
 
     if (c->isfloating)
         XRaiseWindow(dpy, c->win);
+
+    // refocus
 
     focus(NULL);
 }
@@ -1808,7 +1836,7 @@ void resize_mouse (const Arg* arg) {
                 toggle_floating(NULL);
             }
 
-            if (c->isfloating) {
+            if (c->isfloating || selmon->layouts[selmon->current_tag]->arrange == NULL) {
                 if (c->isfullscreen) {
                     c->fx = c->mon->mx;
                     c->fy = c->mon->my;
