@@ -276,7 +276,7 @@ void update_bar_tags (Monitor* m);
 void update_bar_title (Monitor* m);
 void update_bar_window_stat (Monitor* m);
 void update_client_list (void);
-bool update_geom (void);
+void update_monitors (void);
 void update_mon_indicators (void);
 void update_numlock_mask (void);
 void update_smart_borders (Monitor* m);
@@ -311,7 +311,6 @@ int scr_width, scr_height;
 
 Monitor* mons = NULL;
 Monitor* selmon = NULL;
-bool multimon = false;
 
 unsigned long border_normal;
 unsigned long border_selected;
@@ -846,23 +845,25 @@ void configure_notify (XEvent* e) {
     XConfigureEvent* ev = &e->xconfigure;
 
     if (ev->window == root) {
-        bool dirty = scr_width != ev->width || scr_height != ev->height;
-
         scr_width = ev->width;
         scr_height = ev->height;
 
-        if (update_geom() || dirty) {
-            update_bars();
+        update_monitors();
+        update_bars();
 
-            Monitor* m;
-            for (m = mons; m; m = m->next) {
-                loft_widget_move(&m->bar->win.base, m->mx, m->bar_y);
-                loft_widget_resize(&m->bar->win.base, m->mw, m->mh);
-            }
+        update_mon_indicators();
 
-            focus(NULL);
-            arrange(NULL);
+        if (mons->next != NULL)
+            update_bar_mon_selections();
+
+        Monitor* m;
+        for (m = mons; m != NULL; m = m->next) {
+            loft_widget_move(&m->bar->win.base, m->mx, m->bar_y);
+            loft_widget_resize(&m->bar->win.base, m->mw, m->mh);
         }
+
+        focus(NULL);
+        arrange(NULL);
     }
 }
 
@@ -951,6 +952,8 @@ Monitor* create_mon (void) {
 
     m->ltsymbol[0] = '\0';
     m->selstat[0] = '\0';
+
+    m->next = NULL;
 
     for (i = 0; i < LENGTH(tags); i++) {
         m->layouts[i] = &layouts[layouts_init[i]];
@@ -1288,7 +1291,7 @@ void grab_keys (void) {
 }
 
 #ifdef XINERAMA
-static bool isuniquegeom(XineramaScreenInfo* unique, size_t n, XineramaScreenInfo* info) {
+static bool unique_geometry(XineramaScreenInfo* unique, size_t n, XineramaScreenInfo* info) {
     while (n--) {
         if (unique[n].x_org == info->x_org
         && unique[n].y_org == info->y_org
@@ -1583,6 +1586,9 @@ void move_mouse (const Arg* arg) {
                     ny = selmon->wy;
                 else if (ny + HEIGHT(c) < selmon->wy + selmon->wh && ny + HEIGHT(c) > selmon->wy + selmon->wh - snap)
                     ny = selmon->wy + selmon->wh - HEIGHT(c);
+
+                if (ny + HEIGHT(c) <= selmon->bar_y + bar_height)
+                    ny = selmon->bar_y + bar_height + 1;
             }
 
             if ((c->isfloating == false && selmon->layouts[selmon->current_tag]->arrange != NULL)
@@ -2127,11 +2133,15 @@ void setup (void) {
     scr_width = DisplayWidth(dpy, screen);
     scr_height = DisplayHeight(dpy, screen);
 
-    update_geom();
-    update_bars();
+    update_monitors();
+    printf("monitors initialized\n");
 
-    if (multimon) {
+    update_bars();
+    printf("bars initialized\n");
+
+    if (mons->next != NULL) {
         update_mon_indicators();
+        printf("indicators initialized\n");
         update_bar_mon_selections();
     }
 
@@ -2813,84 +2823,60 @@ void update_client_list (void) {
                             (unsigned char *) &(c->win), 1);
 }
 
-bool update_geom (void) {
-    bool dirty = false;
-
+void update_monitors (void) {
 #ifdef XINERAMA
     if (XineramaIsActive(dpy)) {
-        int i, j, n, nn;
+        int i, j, n;
         Client* c;
+
         Monitor* m;
+        Monitor* oldmons = mons;
 
-        XineramaScreenInfo* info = XineramaQueryScreens(dpy, &nn);
-        XineramaScreenInfo* unique = NULL;
-
-        for (n = 0, m = mons; m; m = m->next, n++);
-
-        unique = malloc(sizeof(XineramaScreenInfo) * nn);
+        XineramaScreenInfo* info = XineramaQueryScreens(dpy, &n);
+        XineramaScreenInfo* unique = malloc(sizeof(XineramaScreenInfo) * n);
 
         if (unique == NULL)
             die("out of memory\n");
 
-        for (i = 0, j = 0; i < nn; i++)
-            if (isuniquegeom(unique, j, &info[i]))
+        for (i = 0, j = 0; i < n; i++) {
+            if (unique_geometry(unique, j, &info[i]))
                 memcpy(&unique[j++], &info[i], sizeof(XineramaScreenInfo));
+        }
 
         XFree(info);
-        nn = j;
 
-        // init new monitors
+        n = j;
+        mons = create_mon(); // first monitor
 
-        if (n <= nn) {
-            for (i = 0; i < (nn - n); i++) {
-                for (m = mons; m != NULL && m->next; m = m->next);
-                if (m != NULL)
-                    m->next = create_mon();
-                else
-                    mons = create_mon();
-            }
-
-            for (i = 0, m = mons; i < nn && m; m = m->next, i++) {
-                if (i >= n || (unique[i].x_org != m->mx || unique[i].y_org != m->my || unique[i].width != m->mw || unique[i].height != m->mh)) {
-                    dirty = true;
-
-                    m->num = i;
-                    m->mx = m->wx = unique[i].x_org;
-                    m->my = m->wy = unique[i].y_org;
-                    m->mw = m->ww = unique[i].width;
-                    m->mh = m->wh = unique[i].height;
-
-                    update_struts(m);
-                }
-            }
+        for (i = 1, m = mons; i < n; i++) {
+            m->next = create_mon();
+            m = m->next;
         }
 
-        // clean up unavailable monitors
-
-        else {
-            for (i = nn; i < n; i++) {
-                for (m = mons; m && m->next; m = m->next);
-
-                while (m->clients) {
-                    dirty = true;
-                    c = m->clients;
-                    m->clients = c->next;
-                    detach_stack(c);
-                    c->mon = mons;
-                    attach_head(c);
-                    attach_stack(c);
-                }
-
-                if (m == selmon) {
-                    selmon = mons;
-                    update_bar_mon_selections();
-                }
-
-                destroy_mon(m);
-            }
+        for (i = 0, m = mons; i < n; i++, m = m->next) {
+            m->num = i;
+            m->mx = unique[i].x_org;
+            m->my = unique[i].y_org;
+            m->mw = unique[i].width;
+            m->mh = unique[i].height;
+            update_struts(m);
         }
 
-        update_mon_indicators();
+        while (oldmons != NULL) {
+            m = oldmons;
+
+            for (c = m->clients; c != NULL; c = c->next) {
+                detach(c);
+                detach_stack(c);
+                c->mon = mons;
+                attach_tail(c);
+                attach_stack(c);
+            }
+
+            oldmons = m->next;
+            destroy_mon(m);
+        }
+
         free(unique);
     }
     else
@@ -2900,21 +2886,14 @@ bool update_geom (void) {
             mons = create_mon();
 
         if (mons->mw != scr_width || mons->mh != scr_height) {
-            dirty = true;
             mons->mw = mons->ww = scr_width;
             mons->mh = mons->wh = scr_height;
             update_struts(mons);
         }
     }
 
-    if (dirty) {
-        selmon = mons;
-        selmon = win_to_mon(root);
-    }
-
-    multimon = mons->next != NULL;
-
-    return dirty;
+    selmon = mons;
+    selmon = win_to_mon(root);
 }
 
 void update_mon_indicators (void) {
